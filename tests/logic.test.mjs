@@ -171,17 +171,17 @@ test('Nach dem Lesen: Box 0, morgen fällig', () => {
   const again = L.afterRead(st, 'später', '2026-11-20', 'geld');
   eq(again, st, 'erneutes Lesen ändert die Planung nicht');
 });
-test('Richtige Antworten bei Fälligkeit: Box steigt, Intervalle 3, 7, 21, 60, 180', () => {
+test('Richtige Antworten bei Fälligkeit: Box steigt, Intervalle 3, 7, 14, 30, 60, 120', () => {
   let st = L.afterRead(undefined, 'n', '2026-11-10', 'geld');
   let today = '2026-11-11';
-  const expected = [[1, 3], [2, 7], [3, 21], [4, 60], [5, 180], [5, 180]];
+  const expected = [[1, 3], [2, 7], [3, 14], [4, 30], [5, 60], [6, 120], [6, 120]];
   for (const [box, interval] of expected) {
     st = L.afterAnswer(st, true, today + 'T08:00:00Z', today);
     eq(st.box, box);
     eq(st.due, L.addDays(today, interval));
     today = st.due;
   }
-  eq(st.correct, 6);
+  eq(st.correct, 7);
   eq(st.wrong, 0);
 });
 test('Falsche Antwort setzt immer auf Box 0, fällig morgen', () => {
@@ -246,21 +246,21 @@ test('Quiz zum Vortag: fällig und noch nie abgefragt, älteste zuerst', () => {
   eq(L.selectVortag({}, today), []);
   eq(L.selectVortag(undefined, today), []);
 });
-test('Mehr als 10 offene Fragen: höchstens 10, älteste zuerst, Rest später', () => {
+test('Mehr als 15 offene Fragen: höchstens 15 am Tag, älteste zuerst, Rest später', () => {
   const states = {};
   for (let d = 1; d <= 5; d += 1) for (let s = 1; s <= 5; s += 1) {
     const date = '2026-11-0' + d;
     states[date + '-' + s] = { seenAt: 'x', box: 0, due: L.addDays(date, 1), lastReviewed: null };
   }
   const first = L.selectVortag(states, '2026-11-20', L.quizBudget({}));
-  eq(first.length, 10);
+  eq(first.length, 15);
   eq(first[0], '2026-11-01-1');
-  eq(first[9], '2026-11-02-5');
+  eq(first[14], '2026-11-03-5');
   eq(L.selectVortag(states, '2026-11-20').length, 25);
-  eq(L.quizBudget({ quizCount: 4 }), 6);
-  eq(L.quizBudget({ quizCount: 12 }), 0);
+  eq(L.quizBudget({ quizCount: 4 }), 11);
+  eq(L.quizBudget({ quizCount: 15 }), 0);
   eq(L.quizBudget({ quizDone: true }), 0);
-  eq(L.selectVortag(states, '2026-11-20', L.quizBudget({ quizCount: 7 })).length, 3);
+  eq(L.selectVortag(states, '2026-11-20', L.quizBudget({ quizCount: 12 })).length, 3);
 });
 test('Fakten ohne gültiges Quiz werden nicht abgefragt', () => {
   eq(L.quizzable(fact('2026-11-10', 1)), true);
@@ -553,6 +553,24 @@ test('Nachholen reicht nie vor den ersten Tag der Person zurück', () => {
   eq(L.selectCatchup(facts, {}, '2026-11-12').map((f) => f.id), ['2026-11-08-1', '2026-11-10-1', '2026-11-11-1']);
   eq(L.selectCatchup(facts, {}, '2026-11-12', '2026-11-11').map((f) => f.id), ['2026-11-11-1']);
   eq(L.selectCatchup(facts, {}, '2026-11-12', '2026-11-12'), []);
+});
+
+test('Tägliche Wiederholung: gestern zuerst, dann fällige ältere Fakten', () => {
+  const y = L.afterRead(null, '2026-11-11T08:00:00Z', '2026-11-11', 'geld');
+  const old = { seenAt: '2026-11-01T08:00:00Z', box: 2, due: '2026-11-10', lastReviewed: '2026-11-03T08:00:00Z', firstQuizDone: '2026-11-02' };
+  const later = { seenAt: '2026-11-01T08:00:00Z', box: 2, due: '2026-11-20', lastReviewed: '2026-11-03T08:00:00Z', firstQuizDone: '2026-11-02' };
+  eq(L.selectDaily({ o: old, y: y, l: later }, '2026-11-12'), ['y', 'o']);
+  eq(L.selectDaily({ o: old, y: y }, '2026-11-12', 1), ['y']);
+});
+
+test('Zweitfrage wechselt sich mit der ersten ab', () => {
+  const q1 = { question: 'A?', options: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'x' };
+  const q2 = { question: 'B?', options: ['e', 'f', 'g', 'h'], correct: 2, explanation: 'y' };
+  const f = { id: '2026-12-11-1', quiz: q1, quizAlt: q2 };
+  eq(L.quizFor(f, null).question, 'A?');
+  eq(L.quizFor(f, { correct: 1 }).question, 'B?');
+  eq(L.quizFor(f, { correct: 1, wrong: 1 }).question, 'A?');
+  eq(L.quizFor({ id: 'x', quiz: q1 }, { correct: 1 }).question, 'A?');
 });
 
 /* ---------- result ---------- */
