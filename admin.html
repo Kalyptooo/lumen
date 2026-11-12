@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Lumen Admin</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+/* Admin page: overview of everyone's progress, who may use Lumen, and what the weekly task should write. */
+:root {
+  --bg: #f2f5f3; --surface: #ffffff; --surface-2: #e6ecea; --text: #17211d; --muted: #52605a; --line: #d2dad6;
+  --accent: #0f6b5f; --on-accent: #ffffff; --good: #1a6b41; --warn: #7d5200; --warn-soft: #faefd6; --danger: #a8281f;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-read: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1412; --surface: #181f1c; --surface-2: #232c28; --text: #e7edea; --muted: #a2afa9; --line: #2f3a35;
+    --accent: #72cdb9; --on-accent: #06211c; --good: #7fd4a0; --warn: #e6bd6b; --warn-soft: #33280e; --danger: #f1a39d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1412; --surface: #181f1c; --surface-2: #232c28; --text: #e7edea; --muted: #a2afa9; --line: #2f3a35;
+  --accent: #72cdb9; --on-accent: #06211c; --good: #7fd4a0; --warn: #e6bd6b; --warn-soft: #33280e; --danger: #f1a39d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 1rem; line-height: 1.5; }
+h1, h2, h3, p { margin: 0; }
+button, input, textarea { font: inherit; color: inherit; }
+.wrap { max-width: 64rem; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-left, 0px)) 48px; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+header h1 { font-family: var(--font-read); font-size: 1.5rem; }
+.muted, .hint { color: var(--muted); }
+.hint { font-size: .8125rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h2 { font-size: 1.0625rem; }
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--surface-2); border-radius: 12px; overflow-x: auto; }
+.tabs button { flex: 1 0 auto; min-height: 42px; padding: 4px 14px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 650; }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 11px; border: 1px solid transparent; font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.secondary { background: var(--surface-2); }
+.btn.small { min-height: 34px; padding: 4px 10px; font-size: .875rem; }
+.btn[disabled] { opacity: .45; cursor: default; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: .875rem; font-weight: 600; }
+input[type="email"], input[type="password"], input[type="text"], textarea {
+  width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--bg);
+}
+textarea { min-height: 80px; resize: vertical; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.kpi b { display: block; font-size: 1.625rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.kpi span { color: var(--muted); font-size: .8125rem; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .9375rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .8125rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; min-width: 80px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-2); border-radius: 9px; }
+.seg button { min-height: 32px; padding: 2px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: .8125rem; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 650; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; background: var(--surface-2); color: var(--muted); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.error { color: var(--danger); font-size: .875rem; }
+.note { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 8px 12px; font-size: .875rem; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; z-index: 9; max-width: calc(100% - 32px); }
+@media (max-width: 40rem) { .hide-sm { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="lumen-cloud.js"></script>
+<script>
+(function () {
+  'use strict';
+  const C = window.LumenCloud;
+  const AREAS = [
+    ['geld', 'Geld & Finanzen'], ['recht', 'Recht & Verträge (Österreich)'], ['gesundheit', 'Körper, Gesundheit & Psyche'],
+    ['haushalt', 'Haushalt, Kochen & Hacks'], ['digital', 'Digitale Sicherheit & Internet'], ['verkehr', 'Auto, Verkehr & Reisen'],
+    ['tech', 'Tech & Geräte'], ['erklaert', 'Wie funktioniert das?'], ['natur', 'Natur & Wissenschaft'],
+    ['geschichte', 'Geschichte & Politik'], ['kultur', 'Geografie, Kultur & Sprache'], ['denken', 'Denken, Psychologie & Kommunikation']
+  ];
+  const S = { phase: 'boot', user: null, tab: 'overview', access: null, pub: null, members: {}, digests: {}, manifest: null,
+    form: { email: '', password: '', error: '', busy: false }, titles: {}, weights: null, wish: null, busy: false };
+  const $ = function (id) { return document.getElementById(id); };
+  function h(tag, attrs) {
+    const el = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      const v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else if (k === 'value' || k === 'disabled') el[k] = v;
+      else el.setAttribute(k, v === true ? '' : v);
+    });
+    for (let i = 2; i < arguments.length; i += 1) add(el, arguments[i]);
+    return el;
+  }
+  function add(el, c) {
+    if (c === null || c === undefined || c === false) return;
+    if (Array.isArray(c)) c.forEach(function (x) { add(el, x); });
+    else el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  const btn = function (label, kind, onclick, disabled) { return h('button', { type: 'button', class: 'btn ' + kind, text: label, onclick: onclick, disabled: !!disabled }); };
+  let toastTimer = 0;
+  function toast(msg) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3500); }
+  function todayVienna() {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    return p;
+  }
+  function addDays(d, n) { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+  function fmtDay(d) {
+    if (!d) return '–';
+    const t = new Date(String(d).slice(0, 10) + 'T12:00:00Z');
+    return t.toLocaleDateString('de-AT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  }
+  const norm = function (e) { return String(e || '').trim().toLowerCase(); };
+
+  /* ---------- auth ---------- */
+
+  function boot() {
+    render();
+    if (!C || !C.ready) { S.phase = 'error'; render(); return; }
+    C.auth.onAuthStateChanged(function (u) {
+      S.user = u;
+      if (!u) { S.phase = 'signin'; render(); return; }
+      if (!u.emailVerified) { S.phase = 'verify'; render(); return; }
+      load();
+    });
+  }
+  async function signIn() {
+    const F = S.form;
+    F.busy = true; F.error = ''; render();
+    try { await C.auth.signInWithEmailAndPassword(F.email.trim(), F.password); F.password = ''; }
+    catch (e) { F.error = C.message(e); }
+    F.busy = false; render();
+  }
+  function signOut() { C.auth.signOut().then(function () { location.reload(); }); }
+
+  /* ---------- data ---------- */
+
+  async function load() {
+    S.phase = 'loading'; render();
+    try {
+      const acc = await C.db.doc('config/access').get();
+      S.access = Object.assign({ adminEmails: [], invited: [] }, acc.exists ? acc.data() : {});
+    } catch (e) {
+      S.phase = e && e.code === 'permission-denied' ? 'denied' : 'error';
+      render();
+      return;
+    }
+    try {
+      const got = await Promise.all([
+        C.db.doc('config/public').get(), C.db.collection('members').get(), C.db.collection('digest').get(),
+        C.content.manifest(true).catch(function () { return null; })
+      ]);
+      S.pub = got[0].exists ? got[0].data() : {};
+      S.members = {}; got[1].docs.forEach(function (d) { S.members[d.id] = d.data(); });
+      S.digests = {}; got[2].docs.forEach(function (d) { S.digests[d.id] = d.data(); });
+      S.manifest = got[3];
+      S.weights = Object.assign({}, S.pub.areaWeights || {});
+      S.wish = S.pub.wish || '';
+      S.phase = 'ready';
+      loadTitles();
+    } catch (e) { S.phase = 'error'; }
+    render();
+  }
+  function allReports() {
+    const out = [];
+    Object.keys(S.digests).forEach(function (uid) {
+      (S.digests[uid].reports || []).forEach(function (r) { out.push(Object.assign({ uid: uid }, r)); });
+    });
+    return out.sort(function (a, b) { return String(a.reportedAt) < String(b.reportedAt) ? 1 : -1; });
+  }
+  const handled = function (r) { const u = S.manifest && S.manifest.reportsHandledUntil; return !!(u && r.reportedAt && r.reportedAt <= u); };
+  const forwarded = function (r) { return (S.pub.reports || []).some(function (x) { return x.factId === r.factId && x.reportedAt === r.reportedAt; }); };
+  async function loadTitles() {
+    const days = {};
+    allReports().forEach(function (r) { days[String(r.factId).slice(0, 10)] = true; });
+    await Promise.all(Object.keys(days).map(function (d) {
+      return C.content.day(d).then(function (doc) {
+        Object.keys((doc && doc.items) || {}).forEach(function (k) { S.titles[doc.items[k].id] = doc.items[k].title; });
+      }).catch(function () {});
+    }));
+    render();
+  }
+  async function savePublic(patch, msg) {
+    S.busy = true; render();
+    try {
+      await C.db.doc('config/public').set(Object.assign({ updatedAt: new Date().toISOString() }, patch), { merge: true });
+      Object.assign(S.pub, patch);
+      toast(msg);
+    } catch (e) { toast('Speichern hat nicht geklappt: ' + ((e && e.code) || 'Fehler')); }
+    S.busy = false; render();
+  }
+  async function saveInvited(list) {
+    S.busy = true; render();
+    try {
+      await C.db.doc('config/access').set({ invited: list }, { merge: true });
+      S.access.invited = list;
+      toast('Gespeichert.');
+    } catch (e) { toast('Speichern hat nicht geklappt: ' + ((e && e.code) || 'Fehler')); }
+    S.busy = false; render();
+  }
+
+  /* ---------- views ---------- */
+
+  function render() {
+    const root = $('root');
+    root.textContent = '';
+    root.appendChild(h('header', {}, h('h1', { text: 'Lumen Admin' }),
+      S.user && S.phase !== 'signin' ? h('div', { class: 'row' }, h('span', { class: 'muted', text: S.user.email }), btn('Abmelden', 'secondary small', signOut)) : null));
+    if (S.phase === 'signin') { root.appendChild(signinCard()); return; }
+    if (S.phase === 'verify') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'E-Mail-Adresse noch nicht bestätigt' }), h('p', { class: 'muted', text: 'Bestätige zuerst deine Adresse über die Lernseite und lade diese Seite dann neu.' }))); return; }
+    if (S.phase === 'denied') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Kein Admin-Zugang' }), h('p', { class: 'muted', text: 'Dieses Konto ist kein Admin. Die Lernseite ist unter index.html.' }), h('a', { href: './', text: 'Zur Lernseite' }))); return; }
+    if (S.phase === 'error') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Die Daten sind gerade nicht erreichbar' }), btn('Erneut versuchen', 'primary', load))); return; }
+    if (S.phase !== 'ready') { root.appendChild(h('p', { class: 'muted', text: 'Lädt …' })); return; }
+    const open = allReports().filter(function (r) { return !handled(r); }).length;
+    root.appendChild(h('div', { class: 'tabs', role: 'group', 'aria-label': 'Bereich' },
+      [['overview', 'Übersicht'], ['people', 'Personen'], ['content', 'Inhalte'], ['reports', 'Meldungen' + (open ? ' (' + open + ')' : '')]].map(function (t) {
+        return h('button', { type: 'button', text: t[1], 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; render(); } });
+      })));
+    if (S.tab === 'overview') add(root, overview());
+    else if (S.tab === 'people') add(root, people());
+    else if (S.tab === 'content') add(root, content());
+    else add(root, reports());
+  }
+  function signinCard() {
+    const F = S.form;
+    const field = function (label, key, type, auto) {
+      return h('label', { class: 'field' }, h('span', { text: label }), h('input', { type: type, value: F[key], autocomplete: auto,
+        oninput: function (e) { F[key] = e.target.value; }, onkeydown: function (e) { if (e.key === 'Enter') signIn(); } }));
+    };
+    return h('div', { class: 'card', style: 'max-width:26rem' }, h('h2', { text: 'Anmelden' }),
+      field('E-Mail', 'email', 'email', 'username'), field('Passwort', 'password', 'password', 'current-password'),
+      F.error ? h('p', { class: 'error', role: 'alert', text: F.error }) : null,
+      btn(F.busy ? 'Einen Moment …' : 'Anmelden', 'primary', signIn, F.busy),
+      h('p', { class: 'hint', text: 'Dasselbe Konto wie auf der Lernseite. Ein Konto anlegen oder das Passwort zurücksetzen geht dort.' }));
+  }
+  function personRows() {
+    const ids = Object.keys(Object.assign({}, S.members, S.digests));
+    return ids.map(function (uid) {
+      const m = S.members[uid] || {}, d = S.digests[uid] || {};
+      let right = 0, total = 0;
+      Object.keys(d.areaAccuracy || {}).forEach(function (k) {
+        const a = d.areaAccuracy[k];
+        if (a && a.answered && a.pct !== null) { right += a.pct * a.answered / 100; total += a.answered; }
+      });
+      return { uid: uid, name: m.name || d.name || '', email: m.email || '', lastSeen: m.lastSeen || d.lastDay || '', streak: d.streak || 0,
+        learned: d.seenCount || 0, pct: total ? Math.round(100 * right / total) : null, reports: (d.reports || []).length,
+        invited: S.access.invited.indexOf(norm(m.email)) !== -1 || (S.access.adminEmails || []).indexOf(norm(m.email)) !== -1 };
+    }).sort(function (a, b) { return a.lastSeen < b.lastSeen ? 1 : -1; });
+  }
+  function overview() {
+    const rows = personRows(), t = todayVienna(), week = addDays(t, -6);
+    const active = rows.filter(function (r) { return r.lastSeen >= week; }).length;
+    const learned = rows.reduce(function (s, r) { return s + r.learned; }, 0);
+    const open = allReports().filter(function (r) { return !handled(r); }).length;
+    const m = S.manifest || {};
+    const agg = {};
+    AREAS.forEach(function (a) { agg[a[0]] = { read: 0, right: 0, answered: 0 }; });
+    Object.keys(S.digests).forEach(function (uid) {
+      const acc = S.digests[uid].areaAccuracy || {};
+      Object.keys(acc).forEach(function (k) {
+        if (!agg[k]) return;
+        agg[k].read += acc[k].read || 0;
+        if (acc[k].answered && acc[k].pct !== null) { agg[k].answered += acc[k].answered; agg[k].right += acc[k].pct * acc[k].answered / 100; }
+      });
+    });
+    const maxRead = Math.max.apply(null, AREAS.map(function (a) { return agg[a[0]].read; }).concat([1]));
+    return [
+      h('div', { class: 'kpis' },
+        kpi(S.access.invited.length, 'Personen freigeschaltet'),
+        kpi(active, 'aktiv in den letzten 7 Tagen'),
+        kpi(learned, 'Fakten gelernt, alle zusammen'),
+        kpi(open, 'offene Fehlermeldungen'),
+        kpi(m.lastDate ? fmtDay(m.lastDate) : '–', 'Vorrat reicht bis')),
+      h('div', { class: 'card' }, h('h2', { text: 'Letzte Wochenladung' }),
+        m.lastRun ? [h('p', {}, fmtDay(m.lastRun.at) + ' · ' + (m.lastRun.added || 0) + ' neue Fakten' + (m.lastRun.newsDate ? ' · Aktuell vom ' + fmtDay(m.lastRun.newsDate) : ' · keine Ausgabe Aktuell')),
+          m.lastRun.notes ? h('p', { class: 'hint', text: m.lastRun.notes }) : null] : h('p', { class: 'muted', text: 'Noch kein Lauf.' })),
+      h('div', { class: 'card' }, h('h2', { text: 'Bereiche über alle Personen' }),
+        h('p', { class: 'hint', text: 'Gelesene Fakten und Trefferquote der letzten 30 Antworten je Person, zusammengezählt. Schwache Bereiche kannst du unter „Inhalte“ stärker gewichten.' }),
+        h('div', { class: 'tablewrap' }, h('table', {},
+          h('thead', {}, h('tr', {}, h('th', { text: 'Bereich' }), h('th', { class: 'num', text: 'gelesen' }), h('th', { class: 'hide-sm' }), h('th', { class: 'num', text: 'richtig' }))),
+          h('tbody', {}, AREAS.map(function (a) {
+            const g = agg[a[0]];
+            return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num', text: String(g.read) }),
+              h('td', { class: 'hide-sm' }, h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.round(100 * g.read / maxRead) + '%' }))),
+              h('td', { class: 'num', text: g.answered ? Math.round(100 * g.right / g.answered) + ' %' : '–' }));
+          }))))) ];
+  }
+  function kpi(value, label) { return h('div', { class: 'kpi' }, h('b', { text: String(value) }), h('span', { text: label })); }
+  function people() {
+    const rows = personRows();
+    const input = h('input', { type: 'text', placeholder: 'name@beispiel.at, weitere mit Komma oder Zeilenumbruch', 'aria-label': 'E-Mail-Adressen freischalten' });
+    const registered = {};
+    rows.forEach(function (r) { registered[norm(r.email)] = r; });
+    return [
+      h('div', { class: 'card' }, h('h2', { text: 'Personen' }),
+        rows.length ? h('div', { class: 'tablewrap' }, h('table', {},
+          h('thead', {}, h('tr', {}, ['Name', 'E-Mail', 'zuletzt da', 'Serie', 'gelernt', 'richtig', 'Meldungen'].map(function (t, i) { return h('th', { class: i >= 3 ? 'num' : null, text: t }); }))),
+          h('tbody', {}, rows.map(function (r) {
+            return h('tr', {}, h('td', { text: r.name || '–' }), h('td', {}, r.email || '–', r.invited ? null : [' ', h('span', { class: 'tag warn', text: 'nicht freigeschaltet' })]),
+              h('td', { text: fmtDay(r.lastSeen) }), h('td', { class: 'num', text: r.streak ? r.streak + ' T.' : '–' }),
+              h('td', { class: 'num', text: String(r.learned) }), h('td', { class: 'num', text: r.pct === null ? '–' : r.pct + ' %' }),
+              h('td', { class: 'num', text: String(r.reports) }));
+          })))) : h('p', { class: 'muted', text: 'Noch niemand hat sich angemeldet.' }),
+        h('p', { class: 'hint', text: 'Eine Person erscheint hier, sobald sie ihr Konto bestätigt und Lumen einmal geöffnet hat.' })),
+      h('div', { class: 'card' }, h('h2', { text: 'Freigeschaltete E-Mail-Adressen' }),
+        h('p', { class: 'hint', text: 'Nur diese Adressen können Lumen nutzen. Die Person erstellt ihr Konto selbst auf der Lernseite mit genau dieser Adresse und bestätigt sie per E-Mail.' }),
+        h('div', { class: 'row' }, input, btn('Freischalten', 'primary', function () {
+          const add = input.value.split(/[\s,;]+/).map(norm).filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
+          if (!add.length) { toast('Keine gültige E-Mail-Adresse gefunden.'); return; }
+          const next = S.access.invited.slice();
+          add.forEach(function (e) { if (next.indexOf(e) === -1) next.push(e); });
+          saveInvited(next.sort());
+        }, S.busy)),
+        h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, S.access.invited.map(function (e) {
+          const r = registered[e];
+          return h('tr', {}, h('td', { text: e }), h('td', {}, h('span', { class: 'tag', text: r ? 'Konto aktiv' : 'noch kein Konto' })),
+            h('td', { class: 'num' }, btn('Entfernen', 'secondary small', function () {
+              if (!window.confirm(e + ' entfernen? Die Person kann Lumen dann nicht mehr öffnen; ihr Lernstand bleibt gespeichert.')) return;
+              saveInvited(S.access.invited.filter(function (x) { return x !== e; }));
+            }, S.busy)));
+        })))))
+    ];
+  }
+  function content() {
+    const w = S.weights;
+    const wish = h('textarea', { maxlength: '300', value: S.wish, placeholder: 'Zum Beispiel: mehr über Steuern und Mietrecht', oninput: function (e) { S.wish = e.target.value; } });
+    const changed = JSON.stringify(normWeights(w)) !== JSON.stringify(normWeights(S.pub.areaWeights)) || S.wish.trim() !== (S.pub.wish || '');
+    return [h('div', { class: 'card' }, h('h2', { text: 'Themen für alle' }),
+      h('p', { class: 'hint', text: 'Gilt ab der nächsten Wochenladung am Sonntag für alle Personen. Schon vorbereitete Fakten der kommenden Tage können dabei ersetzt werden.' }),
+      h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, AREAS.map(function (a) {
+        const cur = normWeights(w)[a[0]];
+        return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num' }, h('div', { class: 'seg', role: 'group', 'aria-label': a[1] },
+          [[0.5, 'weniger'], [1, 'normal'], [2, 'mehr']].map(function (x) {
+            return h('button', { type: 'button', text: x[1], 'aria-pressed': String(cur === x[0]), onclick: function () { S.weights[a[0]] = x[0]; render(); } });
+          }))));
+      })))),
+      h('label', { class: 'field' }, h('span', { text: 'Themenwunsch für die nächsten Wochen' }), wish),
+      h('div', { class: 'row' }, btn('Speichern', 'primary', function () {
+        savePublic({ areaWeights: normWeights(S.weights), wish: S.wish.trim().slice(0, 300), settingsChangedAt: new Date().toISOString() }, 'Gespeichert. Gilt ab der nächsten Wochenladung.');
+      }, S.busy || !changed), changed ? h('span', { class: 'hint', text: 'Nicht gespeicherte Änderungen' }) : null),
+      S.pub.settingsChangedAt ? h('p', { class: 'hint', text: 'Zuletzt geändert am ' + fmtDay(S.pub.settingsChangedAt) + '.' }) : null)];
+  }
+  function normWeights(src) {
+    const out = {};
+    AREAS.forEach(function (a) { const v = Number((src || {})[a[0]]); out[a[0]] = (v === 0.5 || v === 2) ? v : 1; });
+    return out;
+  }
+  function reports() {
+    const list = allReports(), open = list.filter(function (r) { return !handled(r); });
+    const toSend = open.filter(function (r) { return !forwarded(r); });
+    return [h('div', { class: 'card' }, h('h2', { text: 'Fehlermeldungen' }),
+      h('p', { class: 'hint', text: 'Weitergegebene Meldungen prüft die Wochenaufgabe am Sonntag anhand von Quellen und korrigiert den Fakt oder zieht ihn zurück. Sie bekommt nur Fakt und Hinweis, keine Namen.' }),
+      h('div', { class: 'row' }, btn(toSend.length ? toSend.length + ' offene Meldung' + (toSend.length === 1 ? '' : 'en') + ' weitergeben' : 'Alles weitergegeben', 'primary', function () {
+        const keep = (S.pub.reports || []).filter(function (x) { return !handled(x); });
+        const next = keep.concat(toSend.map(function (r) { return { factId: r.factId, note: String(r.note || '').slice(0, 200), reportedAt: r.reportedAt }; })).slice(-60);
+        savePublic({ reports: next }, 'Weitergegeben. Die Wochenaufgabe prüft sie am Sonntag.');
+      }, S.busy || !toSend.length)),
+      list.length ? h('div', { class: 'tablewrap' }, h('table', {},
+        h('thead', {}, h('tr', {}, h('th', { text: 'Gemeldet' }), h('th', { text: 'Fakt' }), h('th', { text: 'Hinweis' }), h('th', { text: 'Von' }), h('th', { text: 'Stand' }))),
+        h('tbody', {}, list.map(function (r) {
+          const who = S.members[r.uid] || {};
+          return h('tr', {}, h('td', { text: fmtDay(r.reportedAt) }), h('td', { text: S.titles[r.factId] || r.factId }), h('td', { text: r.note || '–' }),
+            h('td', { text: who.name || who.email || '–' }),
+            h('td', {}, h('span', { class: 'tag' + (handled(r) ? '' : ' warn'), text: handled(r) ? 'bearbeitet' : (forwarded(r) ? 'weitergegeben' : 'neu') })));
+        })))) : h('p', { class: 'muted', text: 'Keine Meldungen.' }))];
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

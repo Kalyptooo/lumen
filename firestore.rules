@@ -1,0 +1,31 @@
+rules_version = '2';
+// Lumen: who may read and write what in Firestore. Paste into Firebase console > Firestore > Rules and publish.
+// config/access (admin only): { adminEmails: [...], invited: [...] }, all addresses in lower case.
+// config/public (readable by anyone, written by admins): topic weights, wish and forwarded error reports for the weekly task.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function email() { return request.auth.token.email.lower(); }
+    function verified() { return signedIn() && request.auth.token.email_verified == true; }
+    function access() { return get(/databases/$(database)/documents/config/access).data; }
+    function isAdmin() { return verified() && email() in access().adminEmails; }
+    function isMember() { return verified() && (email() in access().invited || email() in access().adminEmails); }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /config/public { allow read: if true; allow write: if isAdmin(); }
+    match /config/access { allow read, write: if isAdmin(); }
+
+    match /members/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isSelf(uid) && isMember();
+    }
+    match /digest/{uid} {
+      allow read: if (isSelf(uid) && isMember()) || isAdmin();
+      allow write: if isSelf(uid) && isMember();
+    }
+    match /data/users/{uid}/{docId} {
+      allow read: if (isSelf(uid) && isMember()) || isAdmin();
+      allow write: if isSelf(uid) && isMember();
+    }
+  }
+}
