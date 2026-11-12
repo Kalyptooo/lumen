@@ -1,0 +1,7 @@
+# Working files of the weekly task and local tests
+out/
+out-admin.json
+draft*.json
+news.json
+fix.json
+node_modules/
