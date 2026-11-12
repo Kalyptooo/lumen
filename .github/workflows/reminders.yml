@@ -1,0 +1,20 @@
+name: Erinnerungen
+# Sends the Lumen reminders. Every 15 minutes between 04:00 and 21:59 UTC (05:00 to 23:00 in Vienna).
+on:
+  schedule:
+    - cron: '*/15 4-21 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node tools/send-reminders.mjs
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
