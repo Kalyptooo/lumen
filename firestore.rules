@@ -25,6 +25,18 @@ service cloud.firestore {
       allow write: if isSelf(uid) && isMember();
       allow delete: if isAdmin();
     }
+    // Friends mode: a small summary per person who opted in, visible to all members.
+    match /friends/{uid} {
+      allow read: if isMember();
+      allow write: if isSelf(uid) && isMember();
+      allow delete: if isSelf(uid) || isAdmin();
+    }
+    // Reminders: the device token and stage times; the reminder job reads them with its own service account.
+    match /push/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isSelf(uid) && isMember();
+      allow delete: if isSelf(uid) || isAdmin();
+    }
     match /data/users/{uid}/{docId} {
       allow read: if (isSelf(uid) && isMember()) || isAdmin();
       allow write: if isSelf(uid) && isMember();

@@ -254,6 +254,8 @@ button.sort.on { color: var(--text); text-decoration: underline; }
       await Promise.all(snap.docs.map(function (d) { return C.db.doc('data/users/' + uid + '/' + d.id).delete(); }));
       await C.db.doc('digest/' + uid).delete();
       await C.db.doc('members/' + uid).delete();
+      await C.db.doc('friends/' + uid).delete().catch(function () {});
+      await C.db.doc('push/' + uid).delete().catch(function () {});
       delete S.digests[uid]; delete S.members[uid];
       S.sel = null;
       toast('Daten gelöscht. Das Anmeldekonto selbst löschst du in der Firebase-Konsole unter Authentication.');

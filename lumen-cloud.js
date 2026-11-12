@@ -126,6 +126,7 @@
       out.auth.languageCode = 'de';
       out.db = app.firestore();
       out.db.enablePersistence({ synchronizeTabs: true }).catch(function () { /* private mode or old browser: works online only */ });
+      try { out.messaging = fb.messaging && (!fb.messaging.isSupported || fb.messaging.isSupported()) ? app.messaging() : null; } catch (e) { out.messaging = null; }
       out.ready = true;
     }
   } catch (e) { out.ready = false; }

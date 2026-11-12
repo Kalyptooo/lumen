@@ -11,6 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Lumen">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>try { var lt = localStorage.getItem('lumen-theme'); if (lt) document.documentElement.setAttribute('data-theme', lt); } catch (e) {}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -38,6 +39,19 @@
   --star: #e3b256; --good: #7fd4a0; --good-soft: #16301f; --warn: #e6bd6b; --warn-soft: #33280e; --danger: #f1a39d;
   --scrim: rgba(0, 0, 0, .6); color-scheme: dark;
 }
+
+/* Black: pure black background, white and slightly heavier text, no colour tint. */
+:root[data-theme="black"] {
+  --bg: #000000; --surface: #0b0b0b; --surface-2: #1b1b1b; --text: #ffffff; --muted: #c9c9c9; --line: #2c2c2c;
+  --accent: #ffffff; --on-accent: #000000; --accent-soft: #1f1f1f; --on-accent-soft: #ffffff;
+  --star: #ffd166; --good: #8be3b0; --good-soft: #10261a; --warn: #ffd27a; --warn-soft: #2a2110; --danger: #ff8f86;
+  --scrim: rgba(0, 0, 0, .7); color-scheme: dark;
+}
+:root[data-theme="black"] body { font-weight: 500; -webkit-font-smoothing: antialiased; }
+:root[data-theme="black"] .title, :root[data-theme="black"] .viewtitle, :root[data-theme="black"] .brand b { font-weight: 700; }
+:root[data-theme="black"] .text { font-weight: 500; }
+:root[data-theme="black"] .card { border-color: #262626; }
+:root[data-theme="black"] .btn.primary { font-weight: 700; }
 
 html { height: 100%; box-sizing: border-box; font-size: 106.25%; -webkit-text-size-adjust: 100%; }
 @supports (font: -apple-system-body) { html { font: -apple-system-body; } }
@@ -100,6 +114,48 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   background: var(--accent-soft); color: var(--on-accent-soft); font-size: .8125rem; font-weight: 600;
 }
 .chip.plain { background: var(--surface-2); color: var(--muted); }
+/* Each area has its own hue (--hue) and line icon. */
+.chip.area { gap: 6px; background: hsl(var(--hue) 45% 91%); color: hsl(var(--hue) 45% 25%); }
+.chip.area svg { width: 15px; height: 15px; stroke-width: 2; }
+.adot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: hsl(var(--hue) 55% 48%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chip.area { background: hsl(var(--hue) 26% 17%); color: hsl(var(--hue) 55% 78%); }
+  :root:not([data-theme="light"]) .adot { background: hsl(var(--hue) 55% 62%); }
+}
+:root[data-theme="dark"] .chip.area { background: hsl(var(--hue) 26% 17%); color: hsl(var(--hue) 55% 78%); }
+:root[data-theme="dark"] .adot { background: hsl(var(--hue) 55% 62%); }
+:root[data-theme="black"] .chip.area { background: #171717; color: #ffffff; }
+:root[data-theme="black"] .chip.area svg { color: hsl(var(--hue) 70% 70%); }
+:root[data-theme="black"] .adot { background: hsl(var(--hue) 70% 66%); }
+.chips button .adot { margin-right: 6px; }
+.btn.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.friends { display: flex; flex-direction: column; }
+.friend { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.friend > div { flex: 1; min-width: 0; }
+.friend strong { display: block; font-weight: 600; }
+.friend small { color: var(--muted); font-size: .8125rem; }
+.friend .rank { width: 22px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
+.friend > b { font-size: 1.125rem; font-variant-numeric: tabular-nums; }
+.friend.me strong { color: var(--accent); }
+.weekline { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.weekline span { color: var(--muted); font-size: .875rem; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 8px; text-align: center; }
+.tile b { display: block; font-size: 1.375rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tile span { color: var(--muted); font-size: .75rem; }
+.calhead, .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.calhead span { text-align: center; color: var(--muted); font-size: .6875rem; }
+.cal { margin-top: 4px; }
+.cal i { display: block; aspect-ratio: 1; border-radius: 8px; background: var(--surface-2); }
+.cal i.on { background: var(--accent); }
+.cal i.now { outline: 2px solid var(--text); outline-offset: 1px; }
+.cal i.later { opacity: .35; }
+.scorebar { display: flex; gap: 4px; }
+.scorebar i { flex: 1; height: 6px; border-radius: 3px; background: var(--good); }
+.scorebar i.no { background: var(--warn); }
+.missed { display: flex; flex-direction: column; gap: 4px; }
+.option.picked { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.arearow .line strong { display: inline-flex; align-items: center; gap: 8px; }
 .title { font-family: var(--font-read); font-size: 1.35rem; line-height: 1.25; font-weight: 600; text-wrap: balance; overflow-wrap: anywhere; }
 .text { font-size: 1.0625rem; line-height: 1.55; overflow-wrap: anywhere; }
 .lead { color: var(--muted); }
@@ -288,6 +344,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="lumen-cloud.js"></script>
 <script id="lumen-logic">
@@ -401,6 +458,12 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   function isSeen(st) { return !!(st && st.seenAt); }
   function isKnown(st) { return !!(st && st.known); }
   function isHandled(st) { return isSeen(st) || isKnown(st); }
+  /* Hard for this person: answered wrong at least once and wrong in a third of the answers, or wrong last time. */
+  function isHard(st) {
+    if (!st || !st.wrong || st.known) return false;
+    const total = (st.correct || 0) + st.wrong;
+    return st.wrong / total >= 1 / 3 || ((st.box || 0) === 0 && !!st.lastReviewed);
+  }
   function isDue(st, today) { return !!(st && st.seenAt && !st.known && !st.skip && st.due && st.due <= today); }
   /* The first quiz after reading (Quiz zum Vortag) is still open. Random practice does not count as that quiz.
      Older states without firstQuizDone count as done once they climbed a box. */
@@ -793,7 +856,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     viennaParts: viennaParts, isDateStr: isDateStr, addDays: addDays, diffDays: diffDays, todayStr: todayStr,
     yesterdayStr: yesterdayStr, weekdayOf: weekdayOf, dateOfISO: dateOfISO, parseTime: parseTime, formatDay: formatDay,
     factDate: factDate, monthDocId: monthDocId, bySlot: bySlot, byDateSlot: byDateSlot, factsOfDayDoc: factsOfDayDoc,
-    collectState: collectState, isSeen: isSeen, isKnown: isKnown, isHandled: isHandled, isDue: isDue, firstQuizPending: firstQuizPending, quizzable: quizzable,
+    collectState: collectState, isSeen: isSeen, isKnown: isKnown, isHandled: isHandled, isDue: isDue, isHard: isHard, firstQuizPending: firstQuizPending, quizzable: quizzable,
     afterRead: afterRead, afterKnown: afterKnown, afterUnknown: afterUnknown, afterAnswer: afterAnswer, toggleStar: toggleStar,
     selectVortag: selectVortag, selectDaily: selectDaily, quizFor: quizFor, selectRefresh: selectRefresh, quizBudget: quizBudget, selectCatchup: selectCatchup,
     randomWeight: randomWeight, randomOrder: randomOrder,
@@ -829,11 +892,30 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     mittag: svg(arc + '<circle cx="20" cy="18" r="3.4" fill="currentColor"/>', 'glyph', '40 40'),
     abend: svg(arc + '<circle cx="28.5" cy="21.5" r="3.4" fill="currentColor"/>', 'glyph', '40 40')
   };
+  const AREA_STYLE = {
+    geld: [150, '<circle cx="12" cy="12" r="8"/><path d="M14.5 9.2a3.2 3.2 0 1 0 0 5.6M8.3 11h5.2M8.3 13h5.2"/>'],
+    recht: [222, '<path d="M12 4v16M6 20h12M5 7h14M5 7l-2.5 6h5zM19 7l-2.5 6h5z"/>'],
+    gesundheit: [350, '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'],
+    haushalt: [28, '<path d="M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5"/>'],
+    digital: [265, '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'],
+    verkehr: [205, '<path d="M5 16v-4l2-5h10l2 5v4zM7.5 16v2.5M16.5 16v2.5M5 12h14"/>'],
+    tech: [188, '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 4v3M14 4v3M10 17v3M14 17v3M4 10h3M4 14h3M17 10h3M17 14h3"/>'],
+    erklaert: [45, '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>'],
+    natur: [112, '<path d="M5 19C5 10 11 5 19 5c0 8-5 14-14 14zM5 19l7-7"/>'],
+    geschichte: [18, '<path d="M7 4h10M7 20h10M8 4c0 5 8 5 8 8s-8 3-8 8M16 4c0 5-8 5-8 8s8 3 8 8"/>'],
+    kultur: [172, '<circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c3 3 3 13 0 16M12 4c-3 3-3 13 0 16"/>'],
+    denken: [292, '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>']
+  };
+  function areaChip(key, short) {
+    const a = L.AREA_BY_KEY[key], st = AREA_STYLE[key] || [160, ''];
+    return h('span', { class: 'chip area', style: '--hue:' + st[0], html: svg(st[1]) + '<span></span>' }, a ? (short ? a.short : a.name) : key);
+  }
+  function areaDot(key) { return h('span', { class: 'adot', style: '--hue:' + ((AREA_STYLE[key] || [160])[0]), 'aria-hidden': 'true' }); }
   const QUIZ_TITLE = { vortag: 'Wiederholung', refresh: 'Auffrischen', random: 'Zufällig üben' };
 
   const S = {
     phase: 'boot', stale: false, tab: 'today', now: new Date(), sig: '',
-    db: null, authUser: null, uid: null, manifest: null, pub: {},
+    db: null, authUser: null, uid: null, manifest: null, pub: {}, friends: null,
     form: { mode: 'login', name: '', email: '', password: '', error: '', info: '', busy: false },
     server: {}, priv: {}, exists: {}, queues: {}, ls: { states: {}, days: {} },
     seen: { priv: false, win: false }, fresh: { priv: false, win: false }, dead: {}, unsub: {}, loadTimer: 0,
@@ -885,9 +967,16 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     return out;
   }
   function hapticsOn() {
-    const v = settings().haptics;
-    if (v === true || v === false) return v;
-    return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    // On unless switched off in the settings (no longer tied to Reduce Motion).
+    return settings().haptics !== false;
+  }
+  function setTheme(t) {
+    const root = document.documentElement;
+    if (!t || t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+    try { if (!t || t === 'auto') localStorage.removeItem('lumen-theme'); else localStorage.setItem('lumen-theme', t); } catch (e) { /* private mode */ }
+    const dark = t === 'black' || t === 'dark' || ((!t || t === 'auto') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.setAttribute('content', t === 'black' ? '#000000' : (dark ? '#0f1412' : '#f2f5f3')); });
+    S.sheets.forEach(function (sh) { if (sh.draw) sh.draw(); });
   }
   const tick = L.makeTick({
     isEnabled: hapticsOn,
@@ -997,6 +1086,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     next.startDate = settings().startDate || null;
     next.answered = Object.keys(S.ls.states).reduce(function (n, id) { const st = S.ls.states[id]; return n + (st.correct || 0) + (st.wrong || 0); }, 0);
     next.dueCount = refreshIds().length;
+    publishFriend();
     if (L.sameDigest(next, S.digest)) return;
     digestBusy = true;
     try { await S.db.doc('digest/' + S.uid).set(next); S.digest = next; }
@@ -1067,6 +1157,8 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       overlay();
       arrived('priv', snap);
       if (!snap.metadata.fromCache) { touchMember(); ensureStartDate(); if (S.digestLoaded) touchDigest(); }
+      const th = settings().theme;
+      if (th && th !== (document.documentElement.getAttribute('data-theme') || 'auto')) setTheme(th);
     }, failed('priv'));
   }
   function subWindow() {
@@ -1321,7 +1413,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   function factBody(f, st) {
     const area = L.AREA_BY_KEY[f.area];
     return [
-      h('div', { class: 'cardhead' }, h('span', { class: 'chip', text: area ? area.name : f.area }), starButton(f, st)),
+      h('div', { class: 'cardhead' }, areaChip(f.area), starButton(f, st)),
       h('h2', { class: 'title', text: f.title }),
       h('p', { class: 'text', text: f.text }),
       f.mnemonic ? h('p', { class: 'mnemonic' }, h('b', { text: 'Merksatz' }), f.mnemonic) : null,
@@ -1502,30 +1594,34 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       return;
     }
     if (kind === 'random') facts.forEach(function (f) { S.randomSeen[f.id] = true; });
-    S[key] = { type: 'quiz', kind: kind, facts: facts, index: 0, chosen: null, results: [], done: false };
+    S[key] = { type: 'quiz', kind: kind, facts: facts, index: 0, chosen: null, confirmed: false, results: [], missed: [], done: false };
     if (key === 'flow') S.later.quiz = false;
     render();
     scrollTop();
   }
   function quizCard(flow, key) {
     if (flow.done) return summaryCard(flow, key);
-    const f = flow.facts[flow.index], q = f.quiz, area = L.AREA_BY_KEY[f.area];
-    const answered = flow.chosen !== null, right = answered && flow.chosen === q.correct;
+    const f = flow.facts[flow.index], q = f.quiz;
+    const answered = !!flow.confirmed, right = answered && flow.chosen === q.correct;
     const options = q.options.map(function (text, i) {
       let cls = 'option', tag = null;
       if (answered && i === q.correct) { cls += ' correct'; tag = 'richtig'; }
       else if (answered && i === flow.chosen) { cls += ' chosen'; tag = 'deine Wahl'; }
-      return h('button', { class: cls, type: 'button', disabled: answered, onclick: function () { answer(flow, i); } },
+      else if (!answered && i === flow.chosen) cls += ' picked';
+      return h('button', { class: cls, type: 'button', disabled: answered, 'aria-pressed': answered ? null : String(i === flow.chosen), onclick: function () { pick(flow, i); } },
         h('span', { text: text }), tag ? h('small', { text: tag }) : null);
     });
+    let action;
+    if (answered) action = btn(flow.index + 1 < flow.facts.length ? 'Weiter' : 'Zur Auswertung', 'primary', function () { quizNext(flow); });
+    else action = btn('Antwort bestätigen', 'primary', function () { confirmAnswer(flow); }, flow.chosen === null);
     return [
       h('p', { class: 'label', text: QUIZ_TITLE[flow.kind] + ' · Frage ' + (flow.index + 1) + ' von ' + flow.facts.length }),
       h('article', { class: 'card' },
-        h('div', { class: 'cardhead' }, h('span', { class: 'chip', text: area ? area.name : f.area })),
+        h('div', { class: 'cardhead' }, areaChip(f.area)),
         h('h2', { class: 'title', text: q.question }),
         h('div', { class: 'options' }, options),
         answered ? h('p', { class: 'feedback ' + (right ? 'right' : 'almost'), role: 'status' }, h('b', { text: right ? 'Richtig' : 'Nicht ganz' }), q.explanation || '') : null,
-        answered ? btn(flow.index + 1 < flow.facts.length ? 'Weiter' : 'Zur Auswertung', 'primary', function () { quizNext(flow); }) : null),
+        action),
       btn(key === 'flow' ? 'Später weitermachen' : 'Üben beenden', 'link', function () {
         S[key] = null;
         if (key === 'flow') S.later.quiz = true;
@@ -1534,12 +1630,20 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       })
     ];
   }
-  function answer(flow, i) {
-    if (flow.chosen !== null) return;
-    tick('single');
-    const f = flow.facts[flow.index], ok = i === f.quiz.correct, t = today();
+  /* Tapping an option only selects it; the answer counts after "Antwort bestätigen". */
+  function pick(flow, i) {
+    if (flow.confirmed) return;
     flow.chosen = i;
+    render();
+  }
+  function confirmAnswer(flow) {
+    if (flow.confirmed || flow.chosen === null) return;
+    const f = flow.facts[flow.index], ok = flow.chosen === f.quiz.correct, t = today();
+    flow.confirmed = true;
+    // The tap itself already ticks once (see the click listener); a wrong answer gets a second pulse.
+    if (!ok) setTimeout(function () { tick('single'); }, 130);
     flow.results.push(ok);
+    if (!ok) flow.missed.push(f.id);
     saveState(f.id, L.afterAnswer(S.ls.states[f.id] || { area: f.area }, ok, nowISO(), t, flow.kind));
     const cur = (((S.priv.stats || {}).areas || {})[f.area] || {}).recent;
     const patch = { areas: {}, updatedAt: nowISO() };
@@ -1551,6 +1655,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   function quizNext(flow) {
     flow.index += 1;
     flow.chosen = null;
+    flow.confirmed = false;
     if (flow.index >= flow.facts.length) {
       flow.done = true;
       tick('double');
@@ -1566,10 +1671,17 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       ? [btn('Weiter', 'primary', function () { S.flow = null; render(); scrollTop(); })]
       : [btn('Weiter üben', 'primary', function () { S.pflow = null; startQuiz(flow.kind === 'refresh' && refreshIds().length ? 'refresh' : 'random', 'pflow'); }, S.busy),
         btn('Fertig', 'secondary', function () { S.pflow = null; render(); })];
+    const missed = flow.missed.map(function (id) { return factById(id); }).filter(Boolean);
     return [
       h('p', { class: 'label', text: QUIZ_TITLE[flow.kind] }),
       h('article', { class: 'card' }, h('p', { class: 'big', text: right + ' von ' + n + ' richtig' }),
-        h('p', { class: 'lead', text: right === n ? 'Alles gewusst.' : 'Was noch nicht saß, kommt morgen wieder dran.' }), actions)
+        h('div', { class: 'scorebar', role: 'presentation' }, flow.results.map(function (ok) { return h('i', { class: ok ? 'ok' : 'no' }); })),
+        h('p', { class: 'lead', text: right === n ? 'Alles gewusst.' : 'Was noch nicht saß, kommt morgen wieder dran.' }),
+        missed.length ? h('div', { class: 'missed' }, h('p', { class: 'fieldlabel', text: 'Noch einmal ansehen' }), missed.map(function (f) {
+          return h('button', { class: 'item', type: 'button', onclick: function () { openDetail(f.id); } },
+            areaDot(f.area), h('div', {}, h('strong', { text: f.title }), h('small', { text: L.AREA_BY_KEY[f.area] ? L.AREA_BY_KEY[f.area].short : f.area })), h('span', { html: ICON.next }));
+        })) : null,
+        actions)
     ];
   }
 
@@ -1620,7 +1732,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     } catch (e) { /* the text search over loaded facts still works */ }
   }
   async function loadStarred() {
-    const ids = Object.keys(S.ls.states).filter(function (id) { return S.ls.states[id].starred; }).sort().reverse().slice(0, 60);
+    const ids = Object.keys(S.ls.states).filter(function (id) { return S.ls.states[id].starred || L.isHard(S.ls.states[id]); }).sort().reverse().slice(0, 80);
     await ensureDays(ids.map(L.factDate));
     scheduleRender();
   }
@@ -1630,11 +1742,11 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     if (!A.started) { A.started = true; loadArchive(); }
     const x = chips.scrollLeft;
     chips.textContent = '';
-    [['all', 'Alle'], ['starred', 'Gemerkt']].concat(L.AREAS.map(function (a) { return [a.key, a.short]; })).forEach(function (c) {
+    [['all', 'Alle'], ['starred', 'Gemerkt'], ['hard', 'Schwer für mich']].concat(L.AREAS.map(function (a) { return [a.key, a.short, true]; })).forEach(function (c) {
       chips.appendChild(h('button', {
-        type: 'button', text: c[1], 'aria-pressed': String(A.filter === c[0]),
-        onclick: function () { A.filter = c[0]; A.cap = 120; if (c[0] === 'starred') loadStarred(); render(); }
-      }));
+        type: 'button', 'aria-pressed': String(A.filter === c[0]),
+        onclick: function () { A.filter = c[0]; A.cap = 120; if (c[0] === 'starred' || c[0] === 'hard') loadStarred(); render(); }
+      }, c[2] ? areaDot(c[0]) : null, c[1]));
     });
     chips.scrollLeft = x;
 
@@ -1650,7 +1762,8 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     facts = facts.filter(function (f) {
       const st = S.ls.states[f.id];
       if (A.filter === 'starred' && !(st && st.starred)) return false;
-      if (A.filter !== 'all' && A.filter !== 'starred' && f.area !== A.filter) return false;
+      if (A.filter === 'hard' && !L.isHard(st)) return false;
+      if (A.filter !== 'all' && A.filter !== 'starred' && A.filter !== 'hard' && f.area !== A.filter) return false;
       return !q || L.matchesQuery(f, q) || (q.length >= 3 && hits[f.id]);
     }).sort(function (a, b) { return a.date === b.date ? a.slot - b.slot : (a.date < b.date ? 1 : -1); });
 
@@ -1660,7 +1773,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       if (f.date !== lastDate) { lastDate = f.date; list.appendChild(h('p', { class: 'dayhead', text: L.formatDay(f.date, { long: true }) })); }
       const st = S.ls.states[f.id], area = L.AREA_BY_KEY[f.area];
       const meta = (area ? area.short : f.area) + (f.retired ? ' · zurückgezogen' : (L.isKnown(st) ? ' · bekannt' : (L.isSeen(st) ? ' · gelesen' : ' · neu')));
-      list.appendChild(h('button', { class: 'item', type: 'button', onclick: function () { openDetail(f.id); } },
+      list.appendChild(h('button', { class: 'item', type: 'button', onclick: function () { openDetail(f.id); } }, areaDot(f.area),
         h('div', {}, h('strong', { text: f.title }), h('small', { text: meta })),
         st && st.starred ? h('span', { html: svg('<path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.2-4.1 5.8-.8z"/>', 'mark') }) : null,
         h('span', { html: ICON.next })));
@@ -1728,6 +1841,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       const fast = dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.5;
       if (dy > Math.min(140, panel.offsetHeight * 0.3) || fast) {
         panel.style.transform = 'translateY(100%)';
+        tick('single');
         setTimeout(function () { closeSheet(sheet); }, 180);
       } else panel.style.transform = '';
     };
@@ -1858,32 +1972,190 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     });
   }
 
+  /* ---------- reminders (web push) ---------- */
+
+  const standalone = function () { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; };
+  let pushBusy = false;
+  function savePushTimes() {
+    if (!S.uid) return;
+    S.db.doc('push/' + S.uid).set({ times: times(), updatedAt: nowISO() }, { merge: true }).catch(function () {});
+  }
+  async function enablePush(redraw) {
+    if (pushBusy) return;
+    pushBusy = true; redraw();
+    try {
+      if (!C.messaging || !('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('Ohne deine Erlaubnis kann Lumen nicht erinnern. Du kannst sie in den iPhone-Einstellungen bei Lumen erteilen.'); pushBusy = false; redraw(); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const token = await C.messaging.getToken({ vapidKey: self.LUMEN_VAPID, serviceWorkerRegistration: reg });
+      await S.db.doc('push/' + S.uid).set({ token: token, enabled: true, times: times(), updatedAt: nowISO() }, { merge: true });
+      writePriv('settings', { push: true });
+      toast('Erinnerungen sind an.');
+    } catch (e) {
+      toast(e && e.message === 'unsupported' ? 'Erinnerungen gehen nur, wenn Lumen vom Home-Bildschirm aus geöffnet ist.' : 'Das hat gerade nicht geklappt. Versuch es später noch einmal.');
+    }
+    pushBusy = false; redraw();
+  }
+  async function disablePush(redraw) {
+    writePriv('settings', { push: false });
+    try { await S.db.doc('push/' + S.uid).delete(); } catch (e) { /* ignore */ }
+    try { if (C.messaging) await C.messaging.deleteToken(); } catch (e) { /* ignore */ }
+    toast('Erinnerungen sind aus.');
+    redraw();
+  }
+  function pushSection(t) {
+    const redraw = function () { S.sheets.forEach(function (sh) { sh.draw(); }); };
+    const on = settings().push === true;
+    return h('div', { class: 'section' }, h('h3', { text: 'Erinnerungen' }),
+      h('p', { class: 'hint', text: on
+        ? 'Lumen erinnert dich um ' + t.morgen + ', ' + t.mittag + ' und ' + t.abend + ' Uhr, wenn die Etappe noch offen ist. Die Uhrzeiten änderst du oben bei den Etappen.'
+        : 'Lumen kann dich zu den drei Etappen erinnern, aber nur, wenn noch etwas offen ist.' + (standalone() ? '' : ' Dafür musst du Lumen zuerst zum Home-Bildschirm hinzufügen und von dort öffnen.') }),
+      on ? btn('Erinnerungen ausschalten', 'secondary', function () { disablePush(redraw); })
+        : btn(pushBusy ? 'Einen Moment …' : 'Erinnerungen einschalten', 'primary', function () { enablePush(redraw); }, pushBusy || !standalone()));
+  }
+
+  /* ---------- Freunde (opt-in) and deleting the account ---------- */
+
+  function weekStats() {
+    const t = today(), states = S.ls.states;
+    const monday = L.addDays(t, -((new Date(t + 'T12:00:00Z').getUTCDay() + 6) % 7));
+    const week = Object.keys(states).filter(function (id) { const d = L.dateOfISO(states[id].seenAt); return d && d >= monday && !states[id].known; }).length;
+    const sure = Object.keys(states).filter(function (id) { return !states[id].known && (states[id].box || 0) >= 3; }).length;
+    return { monday: monday, week: week, sure: sure, learned: L.learnedCount(states), streak: L.streak(S.ls.days, t) };
+  }
+  let friendTimer = 0;
+  function publishFriend() {
+    // Only people who switched friends mode on appear for the others; a small summary, no single facts.
+    if (settings().friends !== true || !S.db || !S.uid) return;
+    clearTimeout(friendTimer);
+    friendTimer = setTimeout(function () {
+      const w = weekStats();
+      S.db.doc('friends/' + S.uid).set({
+        name: (S.authUser && S.authUser.displayName) || (S.authUser && S.authUser.email || '').split('@')[0],
+        streak: w.streak, week: w.week, weekOf: w.monday, learned: w.learned, sure: w.sure, updatedAt: nowISO()
+      }).catch(function () {});
+    }, 1500);
+  }
+  function setFriends(on, redraw) {
+    writePriv('settings', { friends: on });
+    if (on) { publishFriend(); loadFriends(redraw); }
+    else { S.friends = null; S.db.doc('friends/' + S.uid).delete().catch(function () {}); if (redraw) redraw(); }
+  }
+  function loadFriends(redraw) {
+    S.db.collection('friends').get().then(function (snap) {
+      S.friends = snap.docs.map(function (d) { return Object.assign({ uid: d.id }, d.data()); });
+      if (redraw) redraw();
+    }).catch(function () { S.friends = []; if (redraw) redraw(); });
+  }
+  function friendsView(redraw) {
+    if (settings().friends !== true) {
+      return h('div', { class: 'section' },
+        h('p', { class: 'lead', text: 'Im Freundesmodus siehst du, wie die anderen dabei sind, und sie sehen dich.' }),
+        h('p', { class: 'hint', text: 'Sichtbar sind nur dein Vorname, deine Serie und wie viele Fakten du diese Woche und insgesamt gelernt hast. Keine Antworten, keine einzelnen Fakten. Du kannst ihn jederzeit wieder ausschalten.' }),
+        btn('Freundesmodus einschalten', 'primary', function () { setFriends(true, redraw); }));
+    }
+    if (!S.friends) { loadFriends(redraw); return h('p', { class: 'hint', text: 'Lädt …' }); }
+    const w = weekStats();
+    const list = S.friends.filter(function (f) { return f.uid === S.uid || f.weekOf === w.monday || f.learned; })
+      .map(function (f) { return f.uid === S.uid ? Object.assign({}, f, { week: w.week, learned: w.learned, streak: w.streak }) : Object.assign({}, f, { week: f.weekOf === w.monday ? f.week : 0 }); })
+      .sort(function (a, b) { return (b.week - a.week) || (b.learned - a.learned); });
+    if (!list.some(function (f) { return f.uid === S.uid; })) list.push({ uid: S.uid, name: 'Du', week: w.week, learned: w.learned, streak: w.streak });
+    const total = list.reduce(function (n, f) { return n + (f.week || 0); }, 0);
+    return h('div', { class: 'section' },
+      h('div', { class: 'weekline' }, h('b', { text: 'Gemeinsam diese Woche' }), h('span', { text: total + (total === 1 ? ' Fakt' : ' Fakten') + ' gelernt von ' + list.length + (list.length === 1 ? ' Person' : ' Personen') })),
+      h('div', { class: 'friends' }, list.map(function (f, i) {
+        return h('div', { class: 'friend' + (f.uid === S.uid ? ' me' : '') },
+          h('span', { class: 'rank', text: String(i + 1) }),
+          h('div', {}, h('strong', { text: f.uid === S.uid ? 'Du' : (f.name || 'Jemand') }),
+            h('small', { text: (f.streak ? f.streak + (f.streak === 1 ? ' Tag' : ' Tage') + ' in Folge · ' : '') + (f.learned || 0) + ' gelernt' })),
+          h('b', { text: String(f.week || 0) }));
+      })),
+      h('p', { class: 'hint', text: 'Die Zahl rechts: Fakten diese Woche (ab Montag).' }),
+      btn('Freundesmodus ausschalten', 'link', function () { setFriends(false, redraw); }));
+  }
+  function openDeleteAccount() {
+    const pw = h('input', { id: 'deletePw', type: 'password', autocomplete: 'current-password' });
+    let busy = false, err = '';
+    const sheet = openSheet('Konto löschen', function () {
+      return [h('p', { class: 'lead', text: 'Dein Konto und dein ganzer Lernstand werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.' }),
+        h('p', { class: 'hint', text: 'Lade vorher eine Sicherung herunter, wenn du deinen Stand behalten willst. Zur Bestätigung brauchst du dein Passwort.' }),
+        h('label', { class: 'field' }, h('span', { text: 'Passwort' }), pw),
+        err ? h('p', { class: 'formerror', role: 'alert', text: err }) : null,
+        btn(busy ? 'Wird gelöscht …' : 'Konto endgültig löschen', 'danger', async function () {
+          if (busy) return;
+          busy = true; err = ''; sheet.draw();
+          try {
+            const u = C.auth.currentUser;
+            if (C.firebase && C.firebase.auth && C.firebase.auth.EmailAuthProvider) {
+              await u.reauthenticateWithCredential(C.firebase.auth.EmailAuthProvider.credential(u.email, pw.value));
+            }
+            stopSubs();
+            const del = function (p) { return S.db.doc(p).delete().catch(function () {}); };
+            await Promise.all(Object.keys(S.server).map(function (k) { return del('data/users/' + S.uid + '/' + k); })
+              .concat([del('digest/' + S.uid), del('members/' + S.uid), del('friends/' + S.uid), del('push/' + S.uid)]));
+            await u.delete();
+            try { localStorage.removeItem('lumen-theme'); } catch (e) { /* ignore */ }
+            location.reload();
+          } catch (e) {
+            busy = false;
+            err = e && e.code === 'auth/requires-recent-login' ? 'Bitte melde dich ab, wieder an und versuch es noch einmal.' : C.message(e);
+            sheet.draw();
+          }
+        }, busy)];
+    });
+  }
+
   /* ---------- Fortschritt und Einstellungen ---------- */
 
   function openProgress() {
     let seg = 'progress';
     const sheet = openSheet('Fortschritt und Einstellungen', function () {
       const tabs = h('div', { class: 'seg', role: 'group', 'aria-label': 'Bereich wählen' },
-        [['progress', 'Fortschritt'], ['settings', 'Einstellungen']].map(function (t) {
+        [['progress', 'Fortschritt'], ['friends', 'Freunde'], ['settings', 'Einstellungen']].map(function (t) {
           return h('button', { type: 'button', text: t[1], 'aria-pressed': String(seg === t[0]), onclick: function () { seg = t[0]; sheet.draw(); sheet.body.scrollTop = 0; } });
         }));
-      return [tabs, seg === 'progress' ? progressView() : settingsView()];
+      return [tabs, seg === 'progress' ? progressView() : (seg === 'friends' ? friendsView(function () { sheet.draw(); }) : settingsView())];
     });
     function areaRow(a, stats, max) {
       const s = stats[a.key];
       return h('div', { class: 'arearow' },
-        h('div', { class: 'line' }, h('strong', { text: a.name }),
+        h('div', { class: 'line' }, h('strong', {}, areaDot(a.key), a.name),
           h('span', { text: s.read + ' gelesen' + (s.pct === null ? '' : ' · ' + s.pct + ' % richtig') })),
         h('div', { class: 'bar', role: 'presentation' }, h('i', { style: 'width:' + Math.round(100 * s.read / max) + '%' })));
     }
     function progressView() {
       const stats = L.areaStats(S.ls.states, S.priv.stats);
       const max = Math.max.apply(null, L.AREAS.map(function (a) { return stats[a.key].read; }).concat([1]));
+      const t = today(), states = S.ls.states, ids = Object.keys(states);
+      const sure = ids.filter(function (id) { return !states[id].known && (states[id].box || 0) >= 3; }).length;
+      const known = ids.filter(function (id) { return states[id].known; }).length;
+      const monday = L.addDays(t, -((new Date(t + 'T12:00:00Z').getUTCDay() + 6) % 7));
+      const weekRead = ids.filter(function (id) { const d = L.dateOfISO(states[id].seenAt); return d && d >= monday && !states[id].known; }).length;
+      const weekDays = Object.keys(S.ls.days).filter(function (d) { return d >= monday && d <= t && L.dayCounts(S.ls.days[d]); }).length;
+      let right = 0, total = 0;
+      const areas = (S.priv.stats && S.priv.stats.areas) || {};
+      Object.keys(areas).forEach(function (k) { (areas[k].recent || []).forEach(function (v) { total += 1; right += v ? 1 : 0; }); });
+      const pct = total ? Math.round(100 * right / total) : null;
+      const start = L.addDays(monday, -28), cells = [];
+      for (let i = 0; i < 35; i += 1) {
+        const d = L.addDays(start, i), rec = S.ls.days[d];
+        cells.push(h('i', { class: (rec && L.dayCounts(rec) ? 'on' : '') + (d === t ? ' now' : '') + (d > t ? ' later' : ''), title: L.formatDay(d) }));
+      }
       return h('div', { class: 'section' },
-        h('p', { class: 'lead', text: L.statusLine(L.streak(S.ls.days, today()), L.learnedCount(S.ls.states)) }),
+        h('p', { class: 'lead', text: L.statusLine(L.streak(S.ls.days, t), L.learnedCount(states)) }),
+        h('div', { class: 'weekline' }, h('b', { text: 'Diese Woche' }),
+          h('span', { text: weekRead + (weekRead === 1 ? ' Fakt' : ' Fakten') + ' gelesen an ' + weekDays + (weekDays === 1 ? ' Tag' : ' Tagen') + (pct === null ? '' : ' · ' + pct + ' % richtig') })),
+        h('div', { class: 'tiles' },
+          tile(L.learnedCount(states), 'gelernt'), tile(sure, 'sicher gewusst'), tile(refreshIds().length, 'fällig'), tile(known, 'schon gekannt')),
+        h('div', {}, h('div', { class: 'calhead' }, ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(function (d) { return h('span', { text: d }); })),
+          h('div', { class: 'cal', role: 'img', 'aria-label': 'Lerntage der letzten fünf Wochen' }, cells)),
+        h('p', { class: 'hint', text: '„Sicher gewusst“ sind Fakten, die du mehrmals hintereinander richtig beantwortet hast; sie kommen erst nach zwei Wochen oder später wieder.' }),
+        h('h3', { text: 'Bereiche', style: 'margin-top:6px' }),
         h('p', { class: 'hint', text: 'Je Bereich: gelesene Fakten und Trefferquote deiner letzten 30 Antworten.' }),
         L.AREAS.map(function (a) { return areaRow(a, stats, max); }));
     }
+    function tile(n, label) { return h('div', { class: 'tile' }, h('b', { text: String(n) }), h('span', { text: label })); }
     function settingsView() {
       const t = times(), u = S.authUser || {};
       const fileInput = h('input', { id: 'importFile', type: 'file', accept: 'application/json,.json', onchange: function (e) { importBackup(e.target.files && e.target.files[0]); e.target.value = ''; } });
@@ -1895,10 +2167,16 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
               const patch = { times: {} };
               patch.times[b] = input.value;
               writePriv('settings', patch);
+              if (settings().push) savePushTimes();
             } });
             return h('label', { class: 'field' }, h('span', { text: L.BLOCK_NAMES[b] }), input);
           })),
           h('p', { class: 'hint', text: 'Ab diesen Uhrzeiten öffnen sich die neuen Fakten. Mit „Früher öffnen“ kannst du jederzeit vorgreifen.' })),
+        h('div', { class: 'section' }, h('h3', { text: 'Darstellung' }),
+          h('div', { class: 'seg', role: 'group', 'aria-label': 'Darstellung' }, [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel'], ['black', 'Schwarz']].map(function (o) {
+            return h('button', { type: 'button', text: o[1], 'aria-pressed': String((settings().theme || 'auto') === o[0]), onclick: function () { writePriv('settings', { theme: o[0] }); setTheme(o[0]); } });
+          })),
+          h('p', { class: 'hint', text: 'Schwarz: reines Schwarz mit kräftiger weißer Schrift. Automatisch folgt der Einstellung deines iPhones.' })),
         h('div', { class: 'section' }, h('h3', { text: 'Haptik' }),
           h('label', { class: 'switchrow' }, h('span', { text: 'Leiser Tick bei Quizantworten' }),
             h('input', { id: 'hapticsToggle', type: 'checkbox', checked: hapticsOn(), onchange: function (e) {
@@ -1908,12 +2186,9 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
           h('p', { class: 'hint', text: 'Funktioniert auf dem iPhone ab iOS 18. Passiert nichts, kannst du den Schalter ausgeschaltet lassen.' })),
         h('div', { class: 'section' }, h('h3', { text: 'Vorrat' }),
           h('p', { class: 'hint', text: S.lastFacts ? 'Vorrat reicht bis ' + L.formatDay(S.lastFacts, { long: true, year: true }) + '. Jeden Sonntag kommen neue Fakten dazu.' : 'Der Vorrat wird geprüft …' })),
-        h('div', { class: 'section' }, h('h3', { text: 'Auf den Home-Bildschirm' }),
-          h('p', { class: 'hint', text: 'Öffne diese Seite in Safari, tippe auf „Teilen“ und dann auf „Zum Home-Bildschirm“. Lumen startet dann wie eine App. Für tägliche Erinnerungen kannst du in der App „Erinnerungen“ drei Erinnerungen um ' + t.morgen + ', ' + t.mittag + ' und ' + t.abend + ' Uhr mit diesem Link anlegen:' }),
-          h('p', { class: 'note', style: 'user-select:all;-webkit-user-select:all;overflow-wrap:anywhere', text: PAGE_URL }),
-          btn('Link kopieren', 'secondary', function () {
-            navigator.clipboard.writeText(PAGE_URL).then(function () { toast('Link kopiert.'); }).catch(function () { toast('Bitte den Link oben gedrückt halten und kopieren.'); });
-          })),
+        pushSection(t),
+        standalone() ? null : h('div', { class: 'section' }, h('h3', { text: 'Auf den Home-Bildschirm' }),
+          h('p', { class: 'hint', text: 'Öffne diese Seite in Safari, tippe auf „Teilen“ und dann auf „Zum Home-Bildschirm“. Lumen startet dann wie eine App, funktioniert auch ohne Internet und kann dich erinnern.' })),
         h('div', { class: 'section' }, h('h3', { text: 'Sicherung' }),
           h('p', { class: 'hint', text: 'Speichert deinen Lernstand und deine Einstellungen als Datei. Mit „Sicherung einspielen“ holst du einen gesicherten Stand zurück; er wird mit dem jetzigen zusammengeführt.' }),
           btn('Sicherung herunterladen', 'secondary', exportBackup),
@@ -1924,6 +2199,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
             C.auth.sendPasswordResetEmail(u.email).then(function () { toast('Ein Link zum Ändern ist an ' + u.email + ' unterwegs.'); }, function (e) { toast(C.message(e)); });
           }),
           btn('Abmelden', 'secondary', signOut),
+          btn('Konto löschen', 'link', openDeleteAccount),
           h('p', { class: 'hint', text: 'Datenschutz: Dein Lernstand liegt in einer Datenbank in Frankfurt. Der Admin sieht deinen Lernfortschritt und deine Fehlermeldungen, aber kein Passwort. Fehlermeldungen gibt er ohne deinen Namen an die Wochenaufgabe weiter, die die Fakten prüft. Möchtest du dein Konto löschen lassen, sag dem Admin Bescheid.' }))
       ];
     }
@@ -1977,6 +2253,12 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     });
   });
   $('btnProgress').addEventListener('click', function () { if (S.phase === 'ready') openProgress(); });
+  /* A light tick on every tap of a button, chip, switch or link-button. */
+  document.addEventListener('click', function (e) {
+    const t = e.target && e.target.closest ? e.target.closest('button, a.btn, [role="button"], input[type="checkbox"], input[type="radio"], select') : null;
+    if (!t || t.disabled || t.closest('.haptic')) return;
+    tick('single');
+  }, true);
   /* Swipe left or right on the page to move between Heute, Üben and Archiv. */
   (function () {
     const order = ['today', 'practice', 'archive'];
@@ -1993,6 +2275,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       const i = order.indexOf(S.tab) + (dx < 0 ? 1 : -1);
       if (i < 0 || i >= order.length) return;
       S.tab = order[i];
+      tick('single');
       render();
       scrollTop();
     }, { passive: true });
@@ -2028,6 +2311,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   setInterval(clock, 20000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) clock(); });
 
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
   boot();
 })();
 </script>

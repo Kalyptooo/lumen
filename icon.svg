@@ -1,12 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<defs>
-<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgb(24,132,114)"/><stop offset="1" stop-color="rgb(8,58,52)"/></linearGradient>
-<radialGradient id="halo" cx=".5" cy=".43" r=".4"><stop offset=".35" stop-color="rgb(255,228,160)" stop-opacity=".4"/><stop offset="1" stop-color="rgb(255,228,160)" stop-opacity="0"/></radialGradient>
-<radialGradient id="sun" cx=".5" cy=".38" r=".6"><stop offset="0" stop-color="rgb(255,228,160)"/><stop offset="1" stop-color="rgb(240,172,66)"/></radialGradient>
-</defs>
-<rect width="100" height="100" rx="22" fill="url(#bg)"/>
-<rect width="100" height="100" rx="22" fill="url(#halo)"/>
-<circle cx="50" cy="43" r="14" fill="url(#sun)"/>
-<polygon points="16.00,57.51 18.77,56.05 21.53,54.96 24.30,54.26 27.07,54.00 29.83,54.18 32.60,54.79 35.37,55.81 38.13,57.21 40.90,58.92 43.67,60.90 46.43,63.06 49.20,65.34 49.20,78.61 46.43,77.29 43.67,76.03 40.90,74.87 38.13,73.87 35.37,73.06 32.60,72.46 29.83,72.10 27.07,72.00 24.30,72.15 21.53,72.56 18.77,73.20 16.00,74.05" fill="rgb(250,246,236)"/>
-<polygon points="50.80,65.34 53.57,63.06 56.33,60.90 59.10,58.92 61.87,57.21 64.63,55.81 67.40,54.79 70.17,54.18 72.93,54.00 75.70,54.26 78.47,54.96 81.23,56.05 84.00,57.51 84.00,74.05 81.23,73.20 78.47,72.56 75.70,72.15 72.93,72.00 70.17,72.10 67.40,72.46 64.63,73.06 61.87,73.87 59.10,74.87 56.33,76.03 53.57,77.29 50.80,78.61" fill="rgb(250,246,236)"/>
+<rect width="100" height="100" rx="22" fill="rgb(10,10,10)"/>
+<circle cx="50" cy="45" r="16" fill="rgb(244,184,86)"/>
+<line x1="28.999999999999996" y1="68" x2="71" y2="68" stroke="rgb(238,238,238)" stroke-width="2.8000000000000003" stroke-linecap="round"/>
 </svg>
