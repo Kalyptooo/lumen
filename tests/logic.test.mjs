@@ -530,6 +530,31 @@ test('Haptik: ausgeschaltet oder ohne Unterstützung passiert nichts, nie ein Fe
   assert.doesNotThrow(() => timers[0]());
 });
 
+/* ---------- first quiz and late joiners ---------- */
+
+test('Zufällig üben am Lesetag verbraucht das Quiz zum Vortag nicht', () => {
+  let st = L.afterRead(null, '2026-11-11T08:00:00Z', '2026-11-11', 'geld');
+  st = L.afterAnswer(st, true, '2026-11-11T19:00:00Z', '2026-11-11', 'random');
+  eq(L.selectVortag({ a: st }, '2026-11-12'), ['a']);
+  eq(L.selectRefresh({ a: st }, '2026-11-12', false), []);
+  const done = L.afterAnswer(st, true, '2026-11-12T08:00:00Z', '2026-11-12', 'vortag');
+  eq(done.firstQuizDone, '2026-11-12');
+  eq(L.selectVortag({ a: done }, '2026-11-15'), []);
+});
+
+test('Ältere Stände: schon eine Box höher gilt als abgefragt', () => {
+  const st = { seenAt: '2026-11-01T08:00:00Z', box: 1, due: '2026-11-05', lastReviewed: '2026-11-02T08:00:00Z' };
+  eq(L.selectVortag({ a: st }, '2026-11-05'), []);
+  eq(L.selectRefresh({ a: st }, '2026-11-05', false), ['a']);
+});
+
+test('Nachholen reicht nie vor den ersten Tag der Person zurück', () => {
+  const facts = ['2026-11-08', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-1', date: d, slot: 1 }));
+  eq(L.selectCatchup(facts, {}, '2026-11-12').map((f) => f.id), ['2026-11-08-1', '2026-11-10-1', '2026-11-11-1']);
+  eq(L.selectCatchup(facts, {}, '2026-11-12', '2026-11-11').map((f) => f.id), ['2026-11-11-1']);
+  eq(L.selectCatchup(facts, {}, '2026-11-12', '2026-11-12'), []);
+});
+
 /* ---------- result ---------- */
 
 if (failures.length) {

@@ -145,6 +145,12 @@ test('Prüfung eines Fakts: Hinweis bei Füller-Optionen und bei auffällig lang
   assert.ok(long.warnings.some((w) => /deutlich länger/.test(w)));
   eq(W.validateFact(quiz(['Sie gelten ab der Unterschrift', 'Sie werden nicht Vertragsbestandteil', 'Sie machen den Vertrag ungültig', 'Sie gelten nach 14 Tagen'], 1)).warnings, []);
 });
+test('Zahlenfragen werden erkannt, Verständnisfragen nicht', () => {
+  assert.ok(W.isNumberQuestion({ question: 'Wie viele Nachbarländer hat Österreich?', options: ['6', '7', '8', '9'] }));
+  assert.ok(W.isNumberQuestion({ question: 'Welche Aussage stimmt?', options: ['1990', '1995', '2000', '2004'] }));
+  assert.ok(!W.isNumberQuestion({ question: 'Warum ist Stoßlüften sparsamer?', options: ['a', 'b', 'c', 'd'] }));
+  assert.ok(!W.isNumberQuestion({ question: 'Was ist bei Aquaplaning richtig?', options: ['Auskuppeln', 'Bremsen', 'Gas geben', 'Lenken'] }));
+});
 test('Position der richtigen Antwort wird gleichmäßig verteilt, Inhalt bleibt richtig', () => {
   const facts = [];
   for (let i = 0; i < 70; i += 1) facts.push({ quiz: { question: 'Q' + i, options: ['richtig', 'f1', 'f2', 'f3'], correct: 0, explanation: 'e' } });
