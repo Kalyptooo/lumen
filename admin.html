@@ -564,6 +564,9 @@ button.sort.on { color: var(--text); text-decoration: underline; }
       h('div', { class: 'quiz' }, h('p', {}, h('b', { text: 'Quiz: ' }), q.question || ''),
         h('ol', {}, (q.options || []).map(function (o, i) { return h('li', { class: i === q.correct ? 'right' : null, text: o + (i === q.correct ? '  ✓' : '') }); })),
         q.explanation ? h('p', { class: 'hint', text: q.explanation }) : null),
+      f.quizAlt ? h('div', { class: 'quiz' }, h('p', {}, h('b', { text: 'Zweitfrage: ' }), f.quizAlt.question || ''),
+        h('ol', {}, (f.quizAlt.options || []).map(function (o, i) { return h('li', { class: i === f.quizAlt.correct ? 'right' : null, text: o + (i === f.quizAlt.correct ? '  ✓' : '') }); })),
+        f.quizAlt.explanation ? h('p', { class: 'hint', text: f.quizAlt.explanation }) : null) : null,
       h('div', { class: 'row' },
         btn('Bearbeiten', 'secondary small', function () { S.edit = { id: f.id, title: f.title, text: f.text, mnemonic: f.mnemonic || '', question: q.question || '', options: (q.options || ['', '', '', '']).slice(), correct: q.correct || 0, explanation: q.explanation || '' }; render(); }, S.busy),
         btn(f.retired ? 'Wieder einblenden' : 'Für alle ausblenden', 'secondary small', function () {
