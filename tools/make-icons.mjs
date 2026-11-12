@@ -1,35 +1,18 @@
-// Draws the app icons without any image library: a warm light rising over an open book on a teal gradient.
+// Draws the app icons without any image library: a warm point of light above a thin line on black.
 //   node tools/make-icons.mjs   → icon-180.png, icon-512.png, icon.svg
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
 const dir = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
-const clamp = (t) => Math.max(0, Math.min(1, t));
-const BG_A = [24, 132, 114], BG_B = [8, 58, 52];          // teal gradient, top left to bottom right
-const SUN_A = [255, 228, 160], SUN_B = [240, 172, 66];    // warm light, centre to edge
-const PAGE = [250, 246, 236], PAGE_SHADE = [222, 214, 196];
-
-// Page edges of the open book seen from the front: low at the spine, rising, the outer corners dipping a little.
-const SPINE = 0.5, LEFT = 0.16, RIGHT = 0.84;
-const wing = (x) => Math.sin((Math.abs(x - SPINE) / (SPINE - LEFT)) * Math.PI * 0.75);
-const pageTop = (x) => 0.66 - 0.12 * wing(x);
-const pageBottom = (x) => 0.79 - 0.07 * wing(x);
+const BG = [10, 10, 10], SUN = [244, 184, 86], LINE = [238, 238, 238];
+const CX = 0.5, CY = 0.45, R = 0.16, LY = 0.68, LH = 0.014, LX0 = 0.29, LX1 = 0.71;
 
 function color(x, y) {
-  let c = mix(BG_A, BG_B, clamp((x + y) / 2));
-  // soft halo around the light
-  const sx = 0.5, sy = 0.43, r = Math.hypot(x - sx, y - sy);
-  const halo = clamp(1 - (r - 0.14) / 0.26);
-  c = mix(c, SUN_A, 0.35 * halo * halo);
-  if (r < 0.14) c = mix(SUN_A, SUN_B, clamp(r / 0.14 * 0.9 + (y - sy) * 1.2));
-  // open book
-  if (x > LEFT && x < RIGHT && Math.abs(x - SPINE) > 0.008 && y > pageTop(x) && y < pageBottom(x)) {
-    const shade = clamp(1 - Math.abs(x - SPINE) / 0.07);
-    c = mix(PAGE, PAGE_SHADE, 0.6 * shade * shade + 0.2 * clamp((y - pageTop(x)) / 0.15));
-  }
-  return c;
+  if (Math.hypot(x - CX, y - CY) < R) return SUN;
+  const dx = x < LX0 ? LX0 - x : (x > LX1 ? x - LX1 : 0);
+  if (Math.hypot(dx, y - LY) < LH) return LINE;
+  return BG;
 }
 function png(size) {
   const ss = 4, rows = [];
@@ -61,26 +44,11 @@ function png(size) {
 fs.writeFileSync(path.join(dir, 'icon-180.png'), png(180));
 fs.writeFileSync(path.join(dir, 'icon-512.png'), png(512));
 
-// SVG version for the browser tab, same shapes.
-const pts = (side) => {
-  const xs = [];
-  for (let i = 0; i <= 12; i += 1) xs.push(side < 0 ? LEFT + (SPINE - 0.008 - LEFT) * i / 12 : SPINE + 0.008 + (RIGHT - SPINE - 0.008) * i / 12);
-  const top = xs.map((x) => `${(x * 100).toFixed(2)},${(pageTop(x) * 100).toFixed(2)}`);
-  const bottom = xs.slice().reverse().map((x) => `${(x * 100).toFixed(2)},${(pageBottom(x) * 100).toFixed(2)}`);
-  return top.concat(bottom).join(' ');
-};
-const rgb = (c) => `rgb(${c.map(Math.round).join(',')})`;
+const rgb = (c) => `rgb(${c.join(',')})`;
 fs.writeFileSync(path.join(dir, 'icon.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<defs>
-<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${rgb(BG_A)}"/><stop offset="1" stop-color="${rgb(BG_B)}"/></linearGradient>
-<radialGradient id="halo" cx=".5" cy=".43" r=".4"><stop offset=".35" stop-color="${rgb(SUN_A)}" stop-opacity=".4"/><stop offset="1" stop-color="${rgb(SUN_A)}" stop-opacity="0"/></radialGradient>
-<radialGradient id="sun" cx=".5" cy=".38" r=".6"><stop offset="0" stop-color="${rgb(SUN_A)}"/><stop offset="1" stop-color="${rgb(SUN_B)}"/></radialGradient>
-</defs>
-<rect width="100" height="100" rx="22" fill="url(#bg)"/>
-<rect width="100" height="100" rx="22" fill="url(#halo)"/>
-<circle cx="50" cy="43" r="14" fill="url(#sun)"/>
-<polygon points="${pts(-1)}" fill="${rgb(PAGE)}"/>
-<polygon points="${pts(1)}" fill="${rgb(PAGE)}"/>
+<rect width="100" height="100" rx="22" fill="${rgb(BG)}"/>
+<circle cx="${CX * 100}" cy="${CY * 100}" r="${R * 100}" fill="${rgb(SUN)}"/>
+<line x1="${LX0 * 100}" y1="${LY * 100}" x2="${LX1 * 100}" y2="${LY * 100}" stroke="${rgb(LINE)}" stroke-width="${LH * 200}" stroke-linecap="round"/>
 </svg>
 `);
 console.log('icons written');
