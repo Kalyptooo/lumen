@@ -573,6 +573,15 @@ test('Zweitfrage wechselt sich mit der ersten ab', () => {
   eq(L.quizFor({ id: 'x', quiz: q1 }, { correct: 1 }).question, 'A?');
 });
 
+test('Schwer für mich: oft falsch oder zuletzt falsch', () => {
+  eq(L.isHard(null), false);
+  eq(L.isHard({ correct: 5, wrong: 0 }), false);
+  eq(L.isHard({ correct: 2, wrong: 1, box: 2, lastReviewed: 'x' }), true);
+  eq(L.isHard({ correct: 5, wrong: 1, box: 2, lastReviewed: 'x' }), false);
+  eq(L.isHard({ correct: 5, wrong: 1, box: 0, lastReviewed: 'x' }), true);
+  eq(L.isHard({ correct: 0, wrong: 2, known: true }), false);
+});
+
 /* ---------- result ---------- */
 
 if (failures.length) {
