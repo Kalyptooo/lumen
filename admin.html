@@ -71,6 +71,26 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .note { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 8px 12px; font-size: .875rem; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; z-index: 9; max-width: calc(100% - 32px); }
 @media (max-width: 40rem) { .hide-sm { display: none; } }
+.btn.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+select { min-height: 34px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); padding: 2px 8px; }
+table.click tbody tr { cursor: pointer; }
+table.click tbody tr:hover, tr.sel { background: var(--surface-2); }
+button.sort { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; }
+button.sort.on { color: var(--text); text-decoration: underline; }
+.chart { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; align-items: end; height: 140px; }
+.chart .col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 2px; }
+.chart .col i { display: block; width: 70%; background: var(--accent); border-radius: 4px 4px 0 0; }
+.chart .v, .chart .d { font-size: .6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.strip { display: grid; grid-template-columns: repeat(30, 1fr); gap: 2px; }
+.strip i { display: block; height: 14px; border-radius: 3px; background: var(--surface-2); }
+.strip i.on { background: var(--accent); }
+.fact h3 { font-family: var(--font-read); font-size: 1.125rem; }
+.fact.retired { opacity: .6; }
+.quiz { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.quiz ol { margin: 6px 0; padding-left: 22px; }
+.quiz li.right { font-weight: 650; color: var(--good); }
+.news ul { margin: 4px 0 10px; padding-left: 20px; }
+.person .kpis { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
 </style>
 </head>
 <body>
@@ -91,8 +111,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     ['tech', 'Tech & Geräte'], ['erklaert', 'Wie funktioniert das?'], ['natur', 'Natur & Wissenschaft'],
     ['geschichte', 'Geschichte & Politik'], ['kultur', 'Geografie, Kultur & Sprache'], ['denken', 'Denken, Psychologie & Kommunikation']
   ];
-  const S = { phase: 'boot', user: null, tab: 'overview', access: null, pub: null, members: {}, digests: {}, manifest: null,
-    form: { email: '', password: '', error: '', busy: false }, titles: {}, weights: null, wish: null, busy: false };
+  const AREA_NAME = {};
+  AREAS.forEach(function (a) { AREA_NAME[a[0]] = a[1]; });
+  const DEFAULT_TIMES = { morgen: '07:00', mittag: '12:00', abend: '18:00' };
+  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['settings', 'Für alle'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['weekly', 'Wochenaufgabe']];
+  const S = {
+    phase: 'boot', user: null, tab: 'overview', access: null, pub: null, members: {}, digests: {}, manifest: null,
+    form: { email: '', password: '', error: '', busy: false }, titles: {}, weights: null, wish: null, busy: false,
+    sel: null, sort: 'lastSeen', day: null, dayDoc: null, edit: null, runs: null, newsList: null, notice: '', times: null
+  };
   const $ = function (id) { return document.getElementById(id); };
   function h(tag, attrs) {
     const el = document.createElement(tag);
@@ -102,7 +129,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       if (k === 'class') el.className = v;
       else if (k === 'text') el.textContent = v;
       else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
-      else if (k === 'value' || k === 'disabled') el[k] = v;
+      else if (k === 'value' || k === 'disabled' || k === 'checked') el[k] = v;
       else el.setAttribute(k, v === true ? '' : v);
     });
     for (let i = 2; i < arguments.length; i += 1) add(el, arguments[i]);
@@ -116,17 +143,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   const btn = function (label, kind, onclick, disabled) { return h('button', { type: 'button', class: 'btn ' + kind, text: label, onclick: onclick, disabled: !!disabled }); };
   let toastTimer = 0;
   function toast(msg) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3500); }
-  function todayVienna() {
-    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    return p;
-  }
+  const todayVienna = function () { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); };
   function addDays(d, n) { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
-  function fmtDay(d) {
+  function fmtDay(d, long) {
     if (!d) return '–';
     const t = new Date(String(d).slice(0, 10) + 'T12:00:00Z');
-    return t.toLocaleDateString('de-AT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    return t.toLocaleDateString('de-AT', long ? { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' } : { day: 'numeric', month: 'short', timeZone: 'UTC' });
   }
   const norm = function (e) { return String(e || '').trim().toLowerCase(); };
+  const nowISO = function () { return new Date().toISOString(); };
+  const errText = function (e) { return (e && e.code) || 'Fehler'; };
 
   /* ---------- auth ---------- */
 
@@ -169,9 +195,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       S.pub = got[0].exists ? got[0].data() : {};
       S.members = {}; got[1].docs.forEach(function (d) { S.members[d.id] = d.data(); });
       S.digests = {}; got[2].docs.forEach(function (d) { S.digests[d.id] = d.data(); });
-      S.manifest = got[3];
+      S.manifest = got[3] || { days: [], news: [], runs: [], idx: [] };
       S.weights = Object.assign({}, S.pub.areaWeights || {});
       S.wish = S.pub.wish || '';
+      S.notice = (S.pub.notice && S.pub.notice.text) || '';
+      S.times = Object.assign({}, DEFAULT_TIMES, S.pub.defaultTimes || {});
+      C.content.setOverrides(S.pub.overrides);
       S.phase = 'ready';
       loadTitles();
     } catch (e) { S.phase = 'error'; }
@@ -189,6 +218,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   async function loadTitles() {
     const days = {};
     allReports().forEach(function (r) { days[String(r.factId).slice(0, 10)] = true; });
+    Object.keys(S.pub.overrides || {}).forEach(function (id) { days[id.slice(0, 10)] = true; });
     await Promise.all(Object.keys(days).map(function (d) {
       return C.content.day(d).then(function (doc) {
         Object.keys((doc && doc.items) || {}).forEach(function (k) { S.titles[doc.items[k].id] = doc.items[k].title; });
@@ -199,20 +229,78 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   async function savePublic(patch, msg) {
     S.busy = true; render();
     try {
-      await C.db.doc('config/public').set(Object.assign({ updatedAt: new Date().toISOString() }, patch), { merge: true });
-      Object.assign(S.pub, patch);
+      await C.db.doc('config/public').set(Object.assign({ updatedAt: nowISO() }, patch), { merge: true });
+      Object.keys(patch).forEach(function (k) {
+        S.pub[k] = (S.pub[k] && typeof S.pub[k] === 'object' && !Array.isArray(S.pub[k]) && patch[k] && typeof patch[k] === 'object' && !Array.isArray(patch[k]))
+          ? Object.assign({}, S.pub[k], patch[k]) : patch[k];
+      });
       toast(msg);
-    } catch (e) { toast('Speichern hat nicht geklappt: ' + ((e && e.code) || 'Fehler')); }
+    } catch (e) { toast('Speichern hat nicht geklappt: ' + errText(e)); }
     S.busy = false; render();
   }
-  async function saveInvited(list) {
+  async function saveAccess(patch, msg) {
     S.busy = true; render();
     try {
-      await C.db.doc('config/access').set({ invited: list }, { merge: true });
-      S.access.invited = list;
-      toast('Gespeichert.');
-    } catch (e) { toast('Speichern hat nicht geklappt: ' + ((e && e.code) || 'Fehler')); }
+      await C.db.doc('config/access').set(patch, { merge: true });
+      Object.assign(S.access, patch);
+      toast(msg || 'Gespeichert.');
+    } catch (e) { toast('Speichern hat nicht geklappt: ' + errText(e)); }
     S.busy = false; render();
+  }
+  async function deletePersonData(uid) {
+    S.busy = true; render();
+    try {
+      const snap = await C.db.collection('data/users/' + uid).get();
+      await Promise.all(snap.docs.map(function (d) { return C.db.doc('data/users/' + uid + '/' + d.id).delete(); }));
+      await C.db.doc('digest/' + uid).delete();
+      await C.db.doc('members/' + uid).delete();
+      delete S.digests[uid]; delete S.members[uid];
+      S.sel = null;
+      toast('Daten gelöscht. Das Anmeldekonto selbst löschst du in der Firebase-Konsole unter Authentication.');
+    } catch (e) { toast('Löschen hat nicht geklappt: ' + errText(e)); }
+    S.busy = false; render();
+  }
+
+  /* ---------- people ---------- */
+
+  function personRows() {
+    const ids = Object.keys(Object.assign({}, S.members, S.digests));
+    return ids.map(function (uid) {
+      const m = S.members[uid] || {}, d = S.digests[uid] || {};
+      let right = 0, total = 0;
+      Object.keys(d.areaAccuracy || {}).forEach(function (k) {
+        const a = d.areaAccuracy[k];
+        if (a && a.answered && a.pct !== null) { right += a.pct * a.answered / 100; total += a.answered; }
+      });
+      const email = norm(m.email);
+      return { uid: uid, name: m.name || d.name || '', email: m.email || '', lastSeen: m.lastSeen || d.lastDay || '', streak: d.streak || 0,
+        learned: d.seenCount || 0, answered: d.answered || 0, pct: total ? Math.round(100 * right / total) : null, reports: (d.reports || []).length,
+        known: (d.knownIds || []).length, due: d.dueCount || 0, start: d.startDate || '', active: d.activeDays || [],
+        admin: S.access.adminEmails.indexOf(email) !== -1, invited: S.access.invited.indexOf(email) !== -1 || S.access.adminEmails.indexOf(email) !== -1 };
+    });
+  }
+  function sortedRows() {
+    const rows = personRows(), k = S.sort;
+    return rows.sort(function (a, b) {
+      if (k === 'name') return (a.name || a.email).localeCompare(b.name || b.email, 'de');
+      const x = a[k], y = b[k];
+      if (x === y) return 0;
+      if (x === null || x === undefined || x === '') return 1;
+      if (y === null || y === undefined || y === '') return -1;
+      return x < y ? 1 : -1;
+    });
+  }
+  function exportCsv() {
+    const rows = sortedRows();
+    const head = ['Name', 'E-Mail', 'Start', 'Zuletzt da', 'Serie', 'Gelernt', 'Antworten', 'Richtig %', 'Bekannt', 'Fällig', 'Meldungen', 'Aktive Tage (30)'];
+    const esc = function (v) { const s = v === null || v === undefined ? '' : String(v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const lines = [head.join(';')].concat(rows.map(function (r) {
+      return [r.name, r.email, r.start, r.lastSeen, r.streak, r.learned, r.answered, r.pct, r.known, r.due, r.reports, r.active.length].map(esc).join(';');
+    }));
+    const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = h('a', { href: url, download: 'lumen-personen-' + todayVienna() + '.csv', style: 'display:none' });
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
   }
 
   /* ---------- views ---------- */
@@ -221,21 +309,19 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const root = $('root');
     root.textContent = '';
     root.appendChild(h('header', {}, h('h1', { text: 'Lumen Admin' }),
-      S.user && S.phase !== 'signin' ? h('div', { class: 'row' }, h('span', { class: 'muted', text: S.user.email }), btn('Abmelden', 'secondary small', signOut)) : null));
+      S.user && S.phase !== 'signin' ? h('div', { class: 'row' }, h('a', { href: './', class: 'muted', text: 'Zur Lernseite' }), h('span', { class: 'muted hide-sm', text: S.user.email }), btn('Abmelden', 'secondary small', signOut)) : null));
     if (S.phase === 'signin') { root.appendChild(signinCard()); return; }
     if (S.phase === 'verify') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'E-Mail-Adresse noch nicht bestätigt' }), h('p', { class: 'muted', text: 'Bestätige zuerst deine Adresse über die Lernseite und lade diese Seite dann neu.' }))); return; }
-    if (S.phase === 'denied') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Kein Admin-Zugang' }), h('p', { class: 'muted', text: 'Dieses Konto ist kein Admin. Die Lernseite ist unter index.html.' }), h('a', { href: './', text: 'Zur Lernseite' }))); return; }
+    if (S.phase === 'denied') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Kein Admin-Zugang' }), h('p', { class: 'muted', text: 'Dieses Konto ist kein Admin.' }), h('a', { href: './', text: 'Zur Lernseite' }))); return; }
     if (S.phase === 'error') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Die Daten sind gerade nicht erreichbar' }), btn('Erneut versuchen', 'primary', load))); return; }
     if (S.phase !== 'ready') { root.appendChild(h('p', { class: 'muted', text: 'Lädt …' })); return; }
     const open = allReports().filter(function (r) { return !handled(r); }).length;
     root.appendChild(h('div', { class: 'tabs', role: 'group', 'aria-label': 'Bereich' },
-      [['overview', 'Übersicht'], ['people', 'Personen'], ['content', 'Inhalte'], ['reports', 'Meldungen' + (open ? ' (' + open + ')' : '')]].map(function (t) {
-        return h('button', { type: 'button', text: t[1], 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; render(); } });
+      TABS.map(function (t) {
+        return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; render(); } });
       })));
-    if (S.tab === 'overview') add(root, overview());
-    else if (S.tab === 'people') add(root, people());
-    else if (S.tab === 'content') add(root, content());
-    else add(root, reports());
+    const view = { overview: overview, people: people, settings: forAll, facts: facts, reports: reports, weekly: weekly }[S.tab];
+    add(root, view());
   }
   function signinCard() {
     const F = S.form;
@@ -249,26 +335,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       btn(F.busy ? 'Einen Moment …' : 'Anmelden', 'primary', signIn, F.busy),
       h('p', { class: 'hint', text: 'Dasselbe Konto wie auf der Lernseite. Ein Konto anlegen oder das Passwort zurücksetzen geht dort.' }));
   }
-  function personRows() {
-    const ids = Object.keys(Object.assign({}, S.members, S.digests));
-    return ids.map(function (uid) {
-      const m = S.members[uid] || {}, d = S.digests[uid] || {};
-      let right = 0, total = 0;
-      Object.keys(d.areaAccuracy || {}).forEach(function (k) {
-        const a = d.areaAccuracy[k];
-        if (a && a.answered && a.pct !== null) { right += a.pct * a.answered / 100; total += a.answered; }
-      });
-      return { uid: uid, name: m.name || d.name || '', email: m.email || '', lastSeen: m.lastSeen || d.lastDay || '', streak: d.streak || 0,
-        learned: d.seenCount || 0, pct: total ? Math.round(100 * right / total) : null, reports: (d.reports || []).length,
-        invited: S.access.invited.indexOf(norm(m.email)) !== -1 || (S.access.adminEmails || []).indexOf(norm(m.email)) !== -1 };
-    }).sort(function (a, b) { return a.lastSeen < b.lastSeen ? 1 : -1; });
-  }
+  function kpi(value, label) { return h('div', { class: 'kpi' }, h('b', { text: String(value) }), h('span', { text: label })); }
+
   function overview() {
     const rows = personRows(), t = todayVienna(), week = addDays(t, -6);
-    const active = rows.filter(function (r) { return r.lastSeen >= week; }).length;
+    const activeToday = rows.filter(function (r) { return r.lastSeen === t || r.active.indexOf(t) !== -1; }).length;
+    const active7 = rows.filter(function (r) { return r.lastSeen >= week; }).length;
     const learned = rows.reduce(function (s, r) { return s + r.learned; }, 0);
+    const answered = rows.reduce(function (s, r) { return s + r.answered; }, 0);
     const open = allReports().filter(function (r) { return !handled(r); }).length;
-    const m = S.manifest || {};
+    const m = S.manifest;
+    const days = [];
+    for (let i = 13; i >= 0; i -= 1) days.push(addDays(t, -i));
+    const perDay = days.map(function (d) { return rows.filter(function (r) { return r.active.indexOf(d) !== -1; }).length; });
+    const maxDay = Math.max.apply(null, perDay.concat([1]));
     const agg = {};
     AREAS.forEach(function (a) { agg[a[0]] = { read: 0, right: 0, answered: 0 }; });
     Object.keys(S.digests).forEach(function (uid) {
@@ -280,18 +360,30 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       });
     });
     const maxRead = Math.max.apply(null, AREAS.map(function (a) { return agg[a[0]].read; }).concat([1]));
+    const idle = rows.filter(function (r) { return r.invited && r.lastSeen && r.lastSeen < week; });
+    const noAccount = S.access.invited.filter(function (e) { return !rows.some(function (r) { return norm(r.email) === e; }); });
+    const notes = [];
+    if (open) notes.push(h('p', {}, open + ' offene Fehlermeldung' + (open === 1 ? '' : 'en') + '. ', h('a', { href: '#', text: 'Zu den Meldungen', onclick: function (e) { e.preventDefault(); S.tab = 'reports'; render(); } })));
+    if (idle.length) notes.push(h('p', { text: 'Länger als eine Woche nicht da: ' + idle.map(function (r) { return r.name || r.email; }).join(', ') + '.' }));
+    if (noAccount.length) notes.push(h('p', { text: 'Freigeschaltet, aber noch kein Konto: ' + noAccount.join(', ') + '.' }));
+    if (m.lastDate && m.lastDate < addDays(t, 14)) notes.push(h('p', { text: 'Der Vorrat reicht nur noch bis ' + fmtDay(m.lastDate) + '. Die Wochenaufgabe füllt sonntags auf.' }));
     return [
       h('div', { class: 'kpis' },
-        kpi(S.access.invited.length, 'Personen freigeschaltet'),
-        kpi(active, 'aktiv in den letzten 7 Tagen'),
-        kpi(learned, 'Fakten gelernt, alle zusammen'),
-        kpi(open, 'offene Fehlermeldungen'),
-        kpi(m.lastDate ? fmtDay(m.lastDate) : '–', 'Vorrat reicht bis')),
-      h('div', { class: 'card' }, h('h2', { text: 'Letzte Wochenladung' }),
-        m.lastRun ? [h('p', {}, fmtDay(m.lastRun.at) + ' · ' + (m.lastRun.added || 0) + ' neue Fakten' + (m.lastRun.newsDate ? ' · Aktuell vom ' + fmtDay(m.lastRun.newsDate) : ' · keine Ausgabe Aktuell')),
-          m.lastRun.notes ? h('p', { class: 'hint', text: m.lastRun.notes }) : null] : h('p', { class: 'muted', text: 'Noch kein Lauf.' })),
+        kpi(S.access.invited.length + S.access.adminEmails.filter(function (e) { return S.access.invited.indexOf(e) === -1; }).length, 'Personen freigeschaltet'),
+        kpi(activeToday, 'heute aktiv'), kpi(active7, 'aktiv in 7 Tagen'),
+        kpi(learned, 'Fakten gelernt, alle zusammen'), kpi(answered, 'Quizantworten gesamt'),
+        kpi(open, 'offene Meldungen'), kpi(m.lastDate ? fmtDay(m.lastDate) : '–', 'Vorrat reicht bis')),
+      notes.length ? h('div', { class: 'card' }, h('h2', { text: 'Zu beachten' }), notes) : null,
+      h('div', { class: 'card' }, h('h2', { text: 'Aktive Personen, letzte 14 Tage' }),
+        h('div', { class: 'chart', role: 'img', 'aria-label': 'Aktive Personen pro Tag' }, days.map(function (d, i) {
+          return h('div', { class: 'col', title: fmtDay(d) + ': ' + perDay[i] },
+            h('span', { class: 'v', text: perDay[i] ? String(perDay[i]) : '' }),
+            h('i', { style: 'height:' + Math.max(2, Math.round(100 * perDay[i] / maxDay)) + '%' }),
+            h('span', { class: 'd', text: d.slice(8) }));
+        })),
+        h('p', { class: 'hint', text: 'Gezählt wird, wer an dem Tag gelesen oder geübt hat.' })),
       h('div', { class: 'card' }, h('h2', { text: 'Bereiche über alle Personen' }),
-        h('p', { class: 'hint', text: 'Gelesene Fakten und Trefferquote der letzten 30 Antworten je Person, zusammengezählt. Schwache Bereiche kannst du unter „Inhalte“ stärker gewichten.' }),
+        h('p', { class: 'hint', text: 'Gelesene Fakten und Trefferquote der letzten 30 Antworten je Person, zusammengezählt. Schwache Bereiche kannst du unter „Für alle“ stärker gewichten.' }),
         h('div', { class: 'tablewrap' }, h('table', {},
           h('thead', {}, h('tr', {}, h('th', { text: 'Bereich' }), h('th', { class: 'num', text: 'gelesen' }), h('th', { class: 'hide-sm' }), h('th', { class: 'num', text: 'richtig' }))),
           h('tbody', {}, AREAS.map(function (a) {
@@ -299,86 +391,287 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
             return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num', text: String(g.read) }),
               h('td', { class: 'hide-sm' }, h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.round(100 * g.read / maxRead) + '%' }))),
               h('td', { class: 'num', text: g.answered ? Math.round(100 * g.right / g.answered) + ' %' : '–' }));
-          }))))) ];
+          })))))
+    ];
   }
-  function kpi(value, label) { return h('div', { class: 'kpi' }, h('b', { text: String(value) }), h('span', { text: label })); }
+
   function people() {
-    const rows = personRows();
-    const input = h('input', { type: 'text', placeholder: 'name@beispiel.at, weitere mit Komma oder Zeilenumbruch', 'aria-label': 'E-Mail-Adressen freischalten' });
+    const rows = sortedRows();
+    const input = h('input', { type: 'text', placeholder: 'name@beispiel.at, weitere mit Komma', 'aria-label': 'E-Mail-Adressen freischalten' });
     const registered = {};
     rows.forEach(function (r) { registered[norm(r.email)] = r; });
+    const cols = [['name', 'Name'], ['lastSeen', 'Zuletzt da'], ['streak', 'Serie'], ['learned', 'Gelernt'], ['pct', 'Richtig'], ['reports', 'Meldungen']];
+    const sel = S.sel && rows.filter(function (r) { return r.uid === S.sel; })[0];
+    const everyone = S.access.adminEmails.concat(S.access.invited.filter(function (e) { return S.access.adminEmails.indexOf(e) === -1; })).sort();
     return [
-      h('div', { class: 'card' }, h('h2', { text: 'Personen' }),
-        rows.length ? h('div', { class: 'tablewrap' }, h('table', {},
-          h('thead', {}, h('tr', {}, ['Name', 'E-Mail', 'zuletzt da', 'Serie', 'gelernt', 'richtig', 'Meldungen'].map(function (t, i) { return h('th', { class: i >= 3 ? 'num' : null, text: t }); }))),
+      h('div', { class: 'card' }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: 'Personen' }), rows.length ? btn('Als CSV herunterladen', 'secondary small', exportCsv) : null),
+        rows.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'click' },
+          h('thead', {}, h('tr', {}, cols.map(function (c, i) {
+            return h('th', { class: i >= 2 ? 'num' : null }, h('button', { type: 'button', class: 'sort' + (S.sort === c[0] ? ' on' : ''), text: c[1], onclick: function () { S.sort = c[0]; render(); } }));
+          }))),
           h('tbody', {}, rows.map(function (r) {
-            return h('tr', {}, h('td', { text: r.name || '–' }), h('td', {}, r.email || '–', r.invited ? null : [' ', h('span', { class: 'tag warn', text: 'nicht freigeschaltet' })]),
+            return h('tr', { class: S.sel === r.uid ? 'sel' : null, tabindex: '0', onclick: function () { S.sel = S.sel === r.uid ? null : r.uid; render(); },
+              onkeydown: function (e) { if (e.key === 'Enter') { S.sel = r.uid; render(); } } },
+              h('td', {}, h('strong', { text: r.name || '–' }), h('div', { class: 'hint', text: r.email }),
+                r.admin ? h('span', { class: 'tag', text: 'Admin' }) : null, r.invited ? null : h('span', { class: 'tag warn', text: 'gesperrt' })),
               h('td', { text: fmtDay(r.lastSeen) }), h('td', { class: 'num', text: r.streak ? r.streak + ' T.' : '–' }),
               h('td', { class: 'num', text: String(r.learned) }), h('td', { class: 'num', text: r.pct === null ? '–' : r.pct + ' %' }),
               h('td', { class: 'num', text: String(r.reports) }));
           })))) : h('p', { class: 'muted', text: 'Noch niemand hat sich angemeldet.' }),
-        h('p', { class: 'hint', text: 'Eine Person erscheint hier, sobald sie ihr Konto bestätigt und Lumen einmal geöffnet hat.' })),
+        h('p', { class: 'hint', text: 'Auf eine Zeile tippen für Details. Eine Person erscheint hier, sobald sie ihr Konto bestätigt und Lumen einmal geöffnet hat.' })),
+      sel ? personCard(sel) : null,
       h('div', { class: 'card' }, h('h2', { text: 'Freigeschaltete E-Mail-Adressen' }),
         h('p', { class: 'hint', text: 'Nur diese Adressen können Lumen nutzen. Die Person erstellt ihr Konto selbst auf der Lernseite mit genau dieser Adresse und bestätigt sie per E-Mail.' }),
         h('div', { class: 'row' }, input, btn('Freischalten', 'primary', function () {
-          const add = input.value.split(/[\s,;]+/).map(norm).filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
-          if (!add.length) { toast('Keine gültige E-Mail-Adresse gefunden.'); return; }
+          const addList = input.value.split(/[\s,;]+/).map(norm).filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
+          if (!addList.length) { toast('Keine gültige E-Mail-Adresse gefunden.'); return; }
           const next = S.access.invited.slice();
-          add.forEach(function (e) { if (next.indexOf(e) === -1) next.push(e); });
-          saveInvited(next.sort());
+          addList.forEach(function (e) { if (next.indexOf(e) === -1) next.push(e); });
+          saveAccess({ invited: next.sort() }, 'Freigeschaltet.');
         }, S.busy)),
-        h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, S.access.invited.map(function (e) {
-          const r = registered[e];
-          return h('tr', {}, h('td', { text: e }), h('td', {}, h('span', { class: 'tag', text: r ? 'Konto aktiv' : 'noch kein Konto' })),
-            h('td', { class: 'num' }, btn('Entfernen', 'secondary small', function () {
+        h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, everyone.map(function (e) {
+          const r = registered[e], isAdmin = S.access.adminEmails.indexOf(e) !== -1;
+          return h('tr', {}, h('td', { text: e }),
+            h('td', {}, h('span', { class: 'tag', text: r ? 'Konto aktiv' : 'noch kein Konto' }), isAdmin ? [' ', h('span', { class: 'tag', text: 'Admin' })] : null),
+            h('td', { class: 'num' }, isAdmin ? null : btn('Entfernen', 'secondary small', function () {
               if (!window.confirm(e + ' entfernen? Die Person kann Lumen dann nicht mehr öffnen; ihr Lernstand bleibt gespeichert.')) return;
-              saveInvited(S.access.invited.filter(function (x) { return x !== e; }));
+              saveAccess({ invited: S.access.invited.filter(function (x) { return x !== e; }) }, 'Entfernt.');
             }, S.busy)));
         })))))
     ];
   }
-  function content() {
-    const w = S.weights;
-    const wish = h('textarea', { maxlength: '300', value: S.wish, placeholder: 'Zum Beispiel: mehr über Steuern und Mietrecht', oninput: function (e) { S.wish = e.target.value; } });
-    const changed = JSON.stringify(normWeights(w)) !== JSON.stringify(normWeights(S.pub.areaWeights)) || S.wish.trim() !== (S.pub.wish || '');
-    return [h('div', { class: 'card' }, h('h2', { text: 'Themen für alle' }),
-      h('p', { class: 'hint', text: 'Gilt ab der nächsten Wochenladung am Sonntag für alle Personen. Schon vorbereitete Fakten der kommenden Tage können dabei ersetzt werden.' }),
+  function personCard(r) {
+    const d = S.digests[r.uid] || {}, t = todayVienna(), email = norm(r.email), self = norm(S.user && S.user.email) === email;
+    const strip = [];
+    for (let i = 29; i >= 0; i -= 1) { const day = addDays(t, -i); strip.push(h('i', { class: r.active.indexOf(day) !== -1 ? 'on' : null, title: fmtDay(day) })); }
+    const acc = d.areaAccuracy || {};
+    const maxRead = Math.max.apply(null, AREAS.map(function (a) { return (acc[a[0]] && acc[a[0]].read) || 0; }).concat([1]));
+    return h('div', { class: 'card person' },
+      h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: (r.name || r.email) + (r.name ? ' · ' + r.email : '') }), btn('Schließen', 'secondary small', function () { S.sel = null; render(); })),
+      h('div', { class: 'kpis' }, kpi(fmtDay(r.start), 'dabei seit'), kpi(fmtDay(r.lastSeen), 'zuletzt da'), kpi(r.streak ? r.streak + ' Tage' : '–', 'Serie'),
+        kpi(r.learned, 'gelernt'), kpi(r.known, 'als bekannt markiert'), kpi(r.answered, 'Quizantworten'), kpi(r.pct === null ? '–' : r.pct + ' %', 'richtig (zuletzt)'), kpi(r.due, 'fällig zum Auffrischen')),
+      h('div', {}, h('p', { class: 'hint', text: 'Aktive Tage, letzte 30 Tage' }), h('div', { class: 'strip' }, strip)),
       h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, AREAS.map(function (a) {
-        const cur = normWeights(w)[a[0]];
-        return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num' }, h('div', { class: 'seg', role: 'group', 'aria-label': a[1] },
-          [[0.5, 'weniger'], [1, 'normal'], [2, 'mehr']].map(function (x) {
-            return h('button', { type: 'button', text: x[1], 'aria-pressed': String(cur === x[0]), onclick: function () { S.weights[a[0]] = x[0]; render(); } });
-          }))));
+        const x = acc[a[0]] || { read: 0, pct: null };
+        return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num', text: String(x.read || 0) }),
+          h('td', { class: 'hide-sm' }, h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.round(100 * (x.read || 0) / maxRead) + '%' }))),
+          h('td', { class: 'num', text: x.pct === null || x.pct === undefined ? '–' : x.pct + ' %' }));
       })))),
-      h('label', { class: 'field' }, h('span', { text: 'Themenwunsch für die nächsten Wochen' }), wish),
-      h('div', { class: 'row' }, btn('Speichern', 'primary', function () {
-        savePublic({ areaWeights: normWeights(S.weights), wish: S.wish.trim().slice(0, 300), settingsChangedAt: new Date().toISOString() }, 'Gespeichert. Gilt ab der nächsten Wochenladung.');
-      }, S.busy || !changed), changed ? h('span', { class: 'hint', text: 'Nicht gespeicherte Änderungen' }) : null),
-      S.pub.settingsChangedAt ? h('p', { class: 'hint', text: 'Zuletzt geändert am ' + fmtDay(S.pub.settingsChangedAt) + '.' }) : null)];
+      (d.reports || []).length ? h('div', {}, h('p', { class: 'hint', text: 'Fehlermeldungen' }), (d.reports || []).map(function (rep) {
+        return h('p', { text: fmtDay(rep.reportedAt) + ' · ' + (S.titles[rep.factId] || rep.factId) + (rep.note ? ': ' + rep.note : '') });
+      })) : null,
+      h('div', { class: 'row' },
+        self ? null : btn(r.admin ? 'Admin-Rechte entfernen' : 'Zum Admin machen', 'secondary', function () {
+          const list = S.access.adminEmails.filter(function (x) { return x !== email; });
+          if (!r.admin) { if (!window.confirm(r.email + ' zum Admin machen? Die Person sieht dann alle Lernstände und kann alles hier ändern.')) return; list.push(email); }
+          saveAccess({ adminEmails: list.sort() }, r.admin ? 'Admin-Rechte entfernt.' : 'Ist jetzt Admin.');
+        }, S.busy || !email),
+        self ? null : btn(r.invited ? 'Zugang sperren' : 'Wieder freischalten', 'secondary', function () {
+          if (r.invited) {
+            if (!window.confirm('Zugang von ' + r.email + ' sperren? Der Lernstand bleibt gespeichert.')) return;
+            saveAccess({ invited: S.access.invited.filter(function (x) { return x !== email; }), adminEmails: S.access.adminEmails.filter(function (x) { return x !== email; }) }, 'Gesperrt.');
+          } else saveAccess({ invited: S.access.invited.concat([email]).sort() }, 'Wieder freigeschaltet.');
+        }, S.busy || !email),
+        self ? null : btn('Lernstand löschen', 'danger', function () {
+          if (!window.confirm('Den gesamten Lernstand von ' + (r.name || r.email) + ' endgültig löschen? Das lässt sich nicht rückgängig machen.')) return;
+          deletePersonData(r.uid);
+        }, S.busy)));
+  }
+
+  function forAll() {
+    const w = S.weights, normW = normWeights(w);
+    const wish = h('textarea', { maxlength: '300', value: S.wish, placeholder: 'Zum Beispiel: mehr über Steuern und Mietrecht', oninput: function (e) { S.wish = e.target.value; } });
+    const changed = JSON.stringify(normW) !== JSON.stringify(normWeights(S.pub.areaWeights)) || S.wish.trim() !== (S.pub.wish || '');
+    const noticeBox = h('textarea', { maxlength: '400', value: S.notice, placeholder: 'Zum Beispiel: Ab Montag gibt es neue Themen.', oninput: function (e) { S.notice = e.target.value; } });
+    const cur = S.pub.notice && S.pub.notice.text;
+    return [
+      h('div', { class: 'card' }, h('h2', { text: 'Mitteilung an alle' }),
+        h('p', { class: 'hint', text: 'Erscheint oben auf „Heute“, bis die Person sie ausblendet. Eine neue Mitteilung erscheint bei allen wieder.' }),
+        noticeBox,
+        h('div', { class: 'row' },
+          btn('Veröffentlichen', 'primary', function () {
+            const text = S.notice.trim().slice(0, 400);
+            if (!text) { toast('Die Mitteilung ist leer.'); return; }
+            savePublic({ notice: { text: text, at: nowISO() } }, 'Mitteilung veröffentlicht.');
+          }, S.busy),
+          cur ? btn('Mitteilung entfernen', 'secondary', function () { S.notice = ''; savePublic({ notice: { text: '', at: nowISO() } }, 'Mitteilung entfernt.'); }, S.busy) : null),
+        cur ? h('p', { class: 'hint', text: 'Aktuell sichtbar seit ' + fmtDay(S.pub.notice.at) + '.' }) : null),
+      h('div', { class: 'card' }, h('h2', { text: 'Themen für alle' }),
+        h('p', { class: 'hint', text: 'Gilt ab der nächsten Wochenladung am Sonntag. Schon vorbereitete Fakten der kommenden Tage können dabei ersetzt werden.' }),
+        h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, AREAS.map(function (a) {
+          return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num' }, h('div', { class: 'seg', role: 'group', 'aria-label': a[1] },
+            [[0.5, 'weniger'], [1, 'normal'], [2, 'mehr']].map(function (x) {
+              return h('button', { type: 'button', text: x[1], 'aria-pressed': String(normW[a[0]] === x[0]), onclick: function () { S.weights[a[0]] = x[0]; render(); } });
+            }))));
+        })))),
+        h('label', { class: 'field' }, h('span', { text: 'Themenwunsch für die nächsten Wochen' }), wish),
+        h('div', { class: 'row' }, btn('Speichern', 'primary', function () {
+          savePublic({ areaWeights: normWeights(S.weights), wish: S.wish.trim().slice(0, 300), settingsChangedAt: nowISO() }, 'Gespeichert. Gilt ab der nächsten Wochenladung.');
+        }, S.busy || !changed), changed ? h('span', { class: 'hint', text: 'Nicht gespeicherte Änderungen' }) : null),
+        S.pub.settingsChangedAt ? h('p', { class: 'hint', text: 'Zuletzt geändert am ' + fmtDay(S.pub.settingsChangedAt) + '.' }) : null),
+      h('div', { class: 'card' }, h('h2', { text: 'Uhrzeiten der Etappen' }),
+        h('p', { class: 'hint', text: 'Standard für alle. Wer selbst Uhrzeiten eingestellt hat, behält die eigenen.' }),
+        h('div', { class: 'row' }, [['morgen', 'Morgen'], ['mittag', 'Mittag'], ['abend', 'Abend']].map(function (b) {
+          return h('label', { class: 'field' }, h('span', { text: b[1] }), h('input', { type: 'time', value: S.times[b[0]], onchange: function (e) { S.times[b[0]] = e.target.value || DEFAULT_TIMES[b[0]]; } }));
+        })),
+        h('div', { class: 'row' }, btn('Uhrzeiten speichern', 'primary', function () { savePublic({ defaultTimes: Object.assign({}, S.times) }, 'Uhrzeiten gespeichert.'); }, S.busy)))
+    ];
   }
   function normWeights(src) {
     const out = {};
     AREAS.forEach(function (a) { const v = Number((src || {})[a[0]]); out[a[0]] = (v === 0.5 || v === 2) ? v : 1; });
     return out;
   }
+
+  /* ---------- facts ---------- */
+
+  function openDay(d) {
+    S.day = d; S.dayDoc = null; S.edit = null; render();
+    C.content.day(d).then(function (doc) { if (S.day === d) { S.dayDoc = doc; render(); } }).catch(function () { toast('Der Tag ließ sich nicht laden.'); });
+  }
+  function facts() {
+    const m = S.manifest, t = todayVienna(), days = (m.days || []).slice();
+    if (!S.day) { const d = days.indexOf(t) !== -1 ? t : days[days.length - 1]; if (d) { S.day = d; setTimeout(function () { openDay(d); }, 0); } }
+    const i = days.indexOf(S.day);
+    const ov = S.pub.overrides || {};
+    const changedIds = Object.keys(ov);
+    return [
+      h('div', { class: 'card' }, h('h2', { text: 'Fakten' }),
+        h('p', { class: 'hint', text: 'Hier siehst du jeden Tag mit seinen fünf Fakten. Ausblenden und Korrekturen gelten sofort für alle; die Wochenaufgabe übernimmt sie am Sonntag auch ins Archiv.' }),
+        h('div', { class: 'row' },
+          btn('‹ Tag davor', 'secondary small', function () { openDay(days[i - 1]); }, i <= 0),
+          h('select', { 'aria-label': 'Tag wählen', onchange: function (e) { openDay(e.target.value); } }, days.slice().reverse().map(function (d) {
+            const o = h('option', { value: d, text: fmtDay(d, true) + (d === t ? ' (heute)' : (d > t ? ' · kommt noch' : '')) });
+            if (d === S.day) o.selected = true;
+            return o;
+          })),
+          btn('Tag danach ›', 'secondary small', function () { openDay(days[i + 1]); }, i < 0 || i >= days.length - 1),
+          days.indexOf(t) !== -1 && S.day !== t ? btn('Heute', 'secondary small', function () { openDay(t); }) : null),
+        changedIds.length ? h('p', { class: 'hint', text: changedIds.length + ' Fakt' + (changedIds.length === 1 ? '' : 'en') + ' von dir geändert oder ausgeblendet: ' + changedIds.map(function (id) { return S.titles[id] || id; }).join(', ') + '.' }) : null),
+      !S.dayDoc ? h('p', { class: 'muted', text: 'Lädt …' }) : Object.keys(S.dayDoc.items || {}).sort().map(function (k) { return factCard(S.dayDoc.items[k]); })
+    ];
+  }
+  function factCard(f) {
+    if (S.edit && S.edit.id === f.id) return editCard(f);
+    const ov = (S.pub.overrides || {})[f.id];
+    const q = f.quiz || {};
+    return h('div', { class: 'card fact' + (f.retired ? ' retired' : '') },
+      h('div', { class: 'row', style: 'justify-content:space-between' },
+        h('span', { class: 'tag', text: 'Platz ' + f.slot + ' · ' + (AREA_NAME[f.area] || f.area) }),
+        h('span', {}, f.retired ? h('span', { class: 'tag warn', text: 'ausgeblendet' }) : null, ov && !ov.retired && ov.adminEdited ? h('span', { class: 'tag', text: 'von dir korrigiert' }) : null, f.correction && !ov ? h('span', { class: 'tag', text: 'korrigiert' }) : null)),
+      h('h3', { text: f.title }), h('p', { text: f.text }),
+      f.mnemonic ? h('p', { class: 'hint', text: 'Merksatz: ' + f.mnemonic }) : null,
+      h('div', { class: 'quiz' }, h('p', {}, h('b', { text: 'Quiz: ' }), q.question || ''),
+        h('ol', {}, (q.options || []).map(function (o, i) { return h('li', { class: i === q.correct ? 'right' : null, text: o + (i === q.correct ? '  ✓' : '') }); })),
+        q.explanation ? h('p', { class: 'hint', text: q.explanation }) : null),
+      h('div', { class: 'row' },
+        btn('Bearbeiten', 'secondary small', function () { S.edit = { id: f.id, title: f.title, text: f.text, mnemonic: f.mnemonic || '', question: q.question || '', options: (q.options || ['', '', '', '']).slice(), correct: q.correct || 0, explanation: q.explanation || '' }; render(); }, S.busy),
+        btn(f.retired ? 'Wieder einblenden' : 'Für alle ausblenden', 'secondary small', function () {
+          if (!f.retired && !window.confirm('„' + f.title + '“ für alle ausblenden? Der Fakt verschwindet aus Heute, Archiv und Quiz.')) return;
+          setOverride(f.id, f.retired ? { retired: false } : { retired: true }, f.retired ? 'Wieder eingeblendet.' : 'Ausgeblendet.');
+        }, S.busy),
+        ov ? btn('Meine Änderung verwerfen', 'secondary small', function () { setOverride(f.id, null, 'Original wiederhergestellt.'); }, S.busy) : null));
+  }
+  function editCard(f) {
+    const E = S.edit;
+    const field = function (label, key, tag, attrs) {
+      return h('label', { class: 'field' }, h('span', { text: label }), h(tag || 'input', Object.assign({ value: E[key], oninput: function (e) { E[key] = e.target.value; } }, attrs || {})));
+    };
+    return h('div', { class: 'card fact' }, h('h2', { text: 'Fakt bearbeiten' }),
+      field('Titel (höchstens 60 Zeichen)', 'title', 'input', { type: 'text', maxlength: '60' }),
+      field('Text', 'text', 'textarea', { rows: '5' }),
+      field('Merksatz (optional)', 'mnemonic', 'input', { type: 'text' }),
+      field('Quizfrage', 'question', 'input', { type: 'text' }),
+      h('div', { class: 'field' }, h('span', { text: 'Antworten (richtige markieren)' }), E.options.map(function (o, i) {
+        return h('div', { class: 'row' }, h('input', { type: 'radio', name: 'correct', checked: E.correct === i, 'aria-label': 'Antwort ' + (i + 1) + ' ist richtig', onchange: function () { E.correct = i; } }),
+          h('input', { type: 'text', value: o, style: 'flex:1', 'aria-label': 'Antwort ' + (i + 1), oninput: function (e) { E.options[i] = e.target.value; } }));
+      })),
+      field('Erklärung (ein Satz)', 'explanation', 'input', { type: 'text' }),
+      h('div', { class: 'row' },
+        btn('Für alle speichern', 'primary', function () {
+          const opts = E.options.map(function (o) { return o.trim(); });
+          if (!E.title.trim() || !E.text.trim() || !E.question.trim() || opts.some(function (o) { return !o; })) { toast('Titel, Text, Frage und alle vier Antworten ausfüllen.'); return; }
+          if (new Set(opts.map(function (o) { return o.toLowerCase(); })).size !== 4) { toast('Die vier Antworten müssen verschieden sein.'); return; }
+          const o = { title: E.title.trim().slice(0, 60), text: E.text.trim(), mnemonic: E.mnemonic.trim(),
+            quiz: { question: E.question.trim(), options: opts, correct: E.correct, explanation: E.explanation.trim() },
+            correction: { at: nowISO(), summary: 'Vom Admin überarbeitet.' }, adminEdited: true, retired: false };
+          setOverride(f.id, o, 'Gespeichert. Gilt sofort für alle.');
+        }, S.busy),
+        btn('Abbrechen', 'secondary', function () { S.edit = null; render(); })));
+  }
+  async function setOverride(id, value, msg) {
+    const next = Object.assign({}, S.pub.overrides || {});
+    if (value) next[id] = value; else delete next[id];
+    S.busy = true; render();
+    try {
+      // The whole map is written so that removed entries disappear too.
+      await C.db.doc('config/public').set({ overrides: next, overridesChangedAt: nowISO(), updatedAt: nowISO() }, { merge: true });
+      S.pub.overrides = next;
+      C.content.setOverrides(next);
+      S.edit = null;
+      toast(msg);
+      if (S.day) { const d = S.day; S.day = null; openDay(d); }
+    } catch (e) { toast('Speichern hat nicht geklappt: ' + errText(e)); }
+    S.busy = false; render();
+  }
+
+  /* ---------- reports ---------- */
+
   function reports() {
     const list = allReports(), open = list.filter(function (r) { return !handled(r); });
     const toSend = open.filter(function (r) { return !forwarded(r); });
     return [h('div', { class: 'card' }, h('h2', { text: 'Fehlermeldungen' }),
-      h('p', { class: 'hint', text: 'Weitergegebene Meldungen prüft die Wochenaufgabe am Sonntag anhand von Quellen und korrigiert den Fakt oder zieht ihn zurück. Sie bekommt nur Fakt und Hinweis, keine Namen.' }),
+      h('p', { class: 'hint', text: 'Du kannst einen Fakt sofort selbst korrigieren oder ausblenden (über „Fakt öffnen“) oder die Meldung an die Wochenaufgabe weitergeben. Die prüft am Sonntag mit Quellen. Sie bekommt nur Fakt und Hinweis, keine Namen.' }),
       h('div', { class: 'row' }, btn(toSend.length ? toSend.length + ' offene Meldung' + (toSend.length === 1 ? '' : 'en') + ' weitergeben' : 'Alles weitergegeben', 'primary', function () {
         const keep = (S.pub.reports || []).filter(function (x) { return !handled(x); });
         const next = keep.concat(toSend.map(function (r) { return { factId: r.factId, note: String(r.note || '').slice(0, 200), reportedAt: r.reportedAt }; })).slice(-60);
         savePublic({ reports: next }, 'Weitergegeben. Die Wochenaufgabe prüft sie am Sonntag.');
       }, S.busy || !toSend.length)),
       list.length ? h('div', { class: 'tablewrap' }, h('table', {},
-        h('thead', {}, h('tr', {}, h('th', { text: 'Gemeldet' }), h('th', { text: 'Fakt' }), h('th', { text: 'Hinweis' }), h('th', { text: 'Von' }), h('th', { text: 'Stand' }))),
+        h('thead', {}, h('tr', {}, h('th', { text: 'Gemeldet' }), h('th', { text: 'Fakt' }), h('th', { text: 'Hinweis' }), h('th', { text: 'Von' }), h('th', { text: 'Stand' }), h('th'))),
         h('tbody', {}, list.map(function (r) {
           const who = S.members[r.uid] || {};
           return h('tr', {}, h('td', { text: fmtDay(r.reportedAt) }), h('td', { text: S.titles[r.factId] || r.factId }), h('td', { text: r.note || '–' }),
             h('td', { text: who.name || who.email || '–' }),
-            h('td', {}, h('span', { class: 'tag' + (handled(r) ? '' : ' warn'), text: handled(r) ? 'bearbeitet' : (forwarded(r) ? 'weitergegeben' : 'neu') })));
+            h('td', {}, h('span', { class: 'tag' + (handled(r) ? '' : ' warn'), text: handled(r) ? 'bearbeitet' : (forwarded(r) ? 'weitergegeben' : 'neu') })),
+            h('td', {}, btn('Fakt öffnen', 'secondary small', function () { S.tab = 'facts'; openDay(String(r.factId).slice(0, 10)); })));
         })))) : h('p', { class: 'muted', text: 'Keine Meldungen.' }))];
+  }
+
+  /* ---------- weekly task ---------- */
+
+  function nextSunday() {
+    const t = todayVienna(), wd = new Date(t + 'T12:00:00Z').getUTCDay();
+    return addDays(t, (7 - wd) % 7);
+  }
+  function weekly() {
+    const m = S.manifest;
+    if (!S.runs) {
+      S.runs = [];
+      Promise.all((m.runs || []).slice(-8).reverse().map(function (id) {
+        return fetch('data/runs/' + id + '.json?v=' + encodeURIComponent(m.updatedAt || '')).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+      })).then(function (list) { S.runs = list.filter(Boolean); render(); });
+      C.content.news(6).then(function (list) { S.newsList = list; render(); }).catch(function () {});
+    }
+    return [
+      h('div', { class: 'card' }, h('h2', { text: 'Wochenaufgabe' }),
+        h('p', {}, 'Läuft jeden Sonntag um 11:07 Uhr (Sommerzeit 12:07 Uhr). Nächster Lauf: ', h('b', { text: fmtDay(nextSunday(), true) }), '.'),
+        h('p', { class: 'hint', text: 'Sie füllt den Vorrat auf mindestens vier Wochen auf, prüft weitergegebene Fehlermeldungen, schreibt „Aktuell“ und übernimmt deine Korrekturen. Was sie liest: deine Themen-Gewichte, den Themenwunsch und die weitergegebenen Meldungen.' }),
+        h('div', { class: 'kpis' }, kpi(m.lastDate ? fmtDay(m.lastDate) : '–', 'Vorrat reicht bis'), kpi((m.days || []).length * 5, 'Fakten im Archiv'), kpi((m.news || []).length, 'Ausgaben „Aktuell“'))),
+      h('div', { class: 'card' }, h('h2', { text: 'Letzte Läufe' }),
+        S.runs && S.runs.length ? h('div', { class: 'tablewrap' }, h('table', {},
+          h('thead', {}, h('tr', {}, h('th', { text: 'Lauf' }), h('th', { class: 'num', text: 'neu' }), h('th', { text: 'Vorrat bis' }), h('th', { text: 'Aktuell' }), h('th', { text: 'Notiz' }))),
+          h('tbody', {}, S.runs.map(function (r) {
+            return h('tr', {}, h('td', { text: fmtDay(r.at || r.date) }), h('td', { class: 'num', text: String(r.added || 0) }), h('td', { text: fmtDay(r.lastDate) }),
+              h('td', { text: r.newsDate ? 'ja' : 'nein' }), h('td', { class: 'hint', text: r.notes || '' }));
+          })))) : h('p', { class: 'muted', text: 'Lädt …' })),
+      h('div', { class: 'card' }, h('h2', { text: 'Ausgaben „Aktuell“' }),
+        S.newsList && S.newsList.length ? S.newsList.map(function (n) {
+          return h('div', { class: 'news' }, h('p', {}, h('b', { text: fmtDay(n.date, true) })), h('ul', {}, (n.items || []).map(function (it) {
+            return h('li', {}, it.title + ' ', it.source && it.source.url ? h('a', { href: it.source.url, target: '_blank', rel: 'noopener noreferrer', text: '(' + (it.source.name || 'Quelle') + ')' }) : null);
+          })));
+        }) : h('p', { class: 'muted', text: 'Noch keine Ausgabe.' }))
+    ];
   }
 
   boot();

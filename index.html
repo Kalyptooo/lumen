@@ -43,7 +43,7 @@ html { height: 100%; box-sizing: border-box; font-size: 106.25%; -webkit-text-si
 @supports (font: -apple-system-body) { html { font: -apple-system-body; } }
 *, *::before, *::after { box-sizing: inherit; }
 body {
-  height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text);
+  height: 100%; height: 100dvh; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); overscroll-behavior: none;
   font-family: var(--font-ui); font-size: 1rem; line-height: 1.5; -webkit-tap-highlight-color: transparent;
 }
 h1, h2, h3, p { margin: 0; }
@@ -54,10 +54,14 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 
 .app { height: 100%; max-width: 34rem; margin: 0 auto; display: flex; flex-direction: column; }
 .top {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding-block: 4px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px;
+  padding-top: max(6px, env(safe-area-inset-top, 0px)); padding-bottom: 2px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
-.status { color: var(--muted); font-size: .875rem; min-width: 0; }
+.brand { display: flex; flex-direction: column; min-width: 0; }
+.brand b { font-family: var(--font-read); font-size: 1.25rem; font-weight: 600; letter-spacing: .01em; line-height: 1.2; }
+.status { color: var(--muted); font-size: .8125rem; min-width: 0; line-height: 1.3; }
+.top .iconbtn { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; width: 44px; height: 44px; }
 .iconbtn {
   width: 48px; height: 48px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 14px; background: transparent; color: var(--text);
@@ -73,9 +77,10 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .tabs {
   display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--bg);
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: max(4px, calc(env(safe-area-inset-bottom, 0px) - 10px));
 }
 .tabs button {
-  min-height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   border: 0; background: transparent; color: var(--muted); font-size: .75rem;
 }
 .tabs button[aria-current="page"] { color: var(--accent); font-weight: 650; }
@@ -182,12 +187,15 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 92%; max-width: 34rem; margin: 0 auto;
   display: flex; flex-direction: column; background: var(--bg); border-radius: 20px 20px 0 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px); touch-action: pan-y;
+  transition: transform .22s ease-out;
 }
 .sheethead {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-block: 8px 4px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(6px, env(safe-area-inset-right, 0px));
 }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 0; flex: none; }
+.sheet.dragging { transition: none; }
 .sheethead h2 { font-size: 1.0625rem; font-weight: 650; overflow-wrap: anywhere; }
 .sheetbody {
   overflow-y: auto; -webkit-overflow-scrolling: touch; padding-block: 6px 28px; display: flex; flex-direction: column; gap: 16px;
@@ -230,6 +238,8 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 }
 [hidden] { display: none !important; }
+.notice { margin-bottom: 14px; border-color: var(--accent); }
+.notice .label { margin: 0; color: var(--accent); }
 .authlinks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .formerror { color: var(--danger); font-size: .875rem; }
 .field input[type="file"] { padding: 10px; }
@@ -238,7 +248,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 <body>
 <div class="app" id="app">
   <header class="top">
-    <p class="status" id="statusLine" aria-live="polite">Lumen</p>
+    <div class="brand"><b>Lumen</b><p class="status" id="statusLine" aria-live="polite"></p></div>
     <button class="iconbtn" id="btnProgress" type="button" aria-label="Fortschritt und Einstellungen öffnen">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
     </button>
@@ -389,6 +399,9 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   function isKnown(st) { return !!(st && st.known); }
   function isHandled(st) { return isSeen(st) || isKnown(st); }
   function isDue(st, today) { return !!(st && st.seenAt && !st.known && !st.skip && st.due && st.due <= today); }
+  /* The first quiz after reading (Quiz zum Vortag) is still open. Random practice does not count as that quiz.
+     Older states without firstQuizDone count as done once they climbed a box. */
+  function firstQuizPending(st) { return !!st && !st.firstQuizDone && !(st.lastReviewed && (st.box || 0) > 0); }
   function quizzable(fact) {
     const q = fact && fact.quiz;
     return !!(fact && !fact.retired && q && typeof q.question === 'string' && q.question &&
@@ -423,10 +436,11 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     }
     return next;
   }
-  function afterAnswer(st, correct, nowISO, today) {
+  function afterAnswer(st, correct, nowISO, today, kind) {
     const prev = st || {};
     const wasDue = !!(prev.due && prev.due <= today);
     const next = Object.assign({}, prev, { lastReviewed: nowISO });
+    if (kind === 'vortag' || (kind === 'refresh' && wasDue)) next.firstQuizDone = today;
     if (correct) {
       next.correct = (prev.correct || 0) + 1;
       if (wasDue) {
@@ -456,7 +470,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   }
   /* First review: due facts that were never asked. Oldest first. */
   function selectVortag(states, today, limit) {
-    const ids = Object.keys(states || {}).filter(function (id) { return isDue(states[id], today) && !states[id].lastReviewed; });
+    const ids = Object.keys(states || {}).filter(function (id) { return isDue(states[id], today) && firstQuizPending(states[id]); });
     ids.sort(byDueThenId(states));
     return typeof limit === 'number' ? ids.slice(0, Math.max(0, limit)) : ids;
   }
@@ -464,7 +478,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
      leftovers of the daily quiz join once that quiz is done for today. */
   function selectRefresh(states, today, includeUnreviewed) {
     const ids = Object.keys(states || {}).filter(function (id) {
-      return isDue(states[id], today) && (includeUnreviewed || !!states[id].lastReviewed);
+      return isDue(states[id], today) && (includeUnreviewed || !firstQuizPending(states[id]));
     });
     ids.sort(byDueThenId(states));
     return ids;
@@ -474,9 +488,10 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     if (rec.quizDone) return 0;
     return Math.max(0, QUIZ_LIMIT - (rec.quizCount || 0));
   }
-  /* Unread facts of the last seven days (not today). */
-  function selectCatchup(facts, states, today) {
-    const from = addDays(today, -CATCHUP_DAYS);
+  /* Unread facts of the last seven days (not today), never from before the person started. */
+  function selectCatchup(facts, states, today, startDate) {
+    let from = addDays(today, -CATCHUP_DAYS);
+    if (isDateStr(startDate) && startDate > from) from = startDate;
     return (facts || []).filter(function (f) {
       return f && !f.retired && f.date >= from && f.date < today && !isHandled((states || {})[f.id]);
     }).sort(byDateSlot);
@@ -760,7 +775,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     viennaParts: viennaParts, isDateStr: isDateStr, addDays: addDays, diffDays: diffDays, todayStr: todayStr,
     yesterdayStr: yesterdayStr, weekdayOf: weekdayOf, dateOfISO: dateOfISO, parseTime: parseTime, formatDay: formatDay,
     factDate: factDate, monthDocId: monthDocId, bySlot: bySlot, byDateSlot: byDateSlot, factsOfDayDoc: factsOfDayDoc,
-    collectState: collectState, isSeen: isSeen, isKnown: isKnown, isHandled: isHandled, isDue: isDue, quizzable: quizzable,
+    collectState: collectState, isSeen: isSeen, isKnown: isKnown, isHandled: isHandled, isDue: isDue, firstQuizPending: firstQuizPending, quizzable: quizzable,
     afterRead: afterRead, afterKnown: afterKnown, afterUnknown: afterUnknown, afterAnswer: afterAnswer, toggleStar: toggleStar,
     selectVortag: selectVortag, selectRefresh: selectRefresh, quizBudget: quizBudget, selectCatchup: selectCatchup,
     randomWeight: randomWeight, randomOrder: randomOrder,
@@ -800,7 +815,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 
   const S = {
     phase: 'boot', stale: false, tab: 'today', now: new Date(), sig: '',
-    db: null, authUser: null, uid: null, manifest: null,
+    db: null, authUser: null, uid: null, manifest: null, pub: {},
     form: { mode: 'login', name: '', email: '', password: '', error: '', info: '', busy: false },
     server: {}, priv: {}, exists: {}, queues: {}, ls: { states: {}, days: {} },
     seen: { priv: false, win: false }, fresh: { priv: false, win: false }, dead: {}, unsub: {}, loadTimer: 0,
@@ -841,7 +856,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   const parts = function () { return L.viennaParts(S.now); };
   const today = function () { return parts().date; };
   const settings = function () { return S.priv.settings || {}; };
-  const times = function () { return Object.assign({}, L.DEFAULT_TIMES, settings().times || {}); };
+  const times = function () { return Object.assign({}, L.DEFAULT_TIMES, (S.pub && S.pub.defaultTimes) || {}, settings().times || {}); };
   const dayRec = function (d) { return S.ls.days[d || today()] || {}; };
   const clone = function (o) { return JSON.parse(JSON.stringify(o)); };
   const isObj = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };
@@ -959,6 +974,11 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     next.streak = L.streak(S.ls.days, today());
     next.lastDay = Object.keys(S.ls.days).sort().pop() || null;
     next.name = (S.authUser && S.authUser.displayName) || '';
+    const from = L.addDays(today(), -29);
+    next.activeDays = Object.keys(S.ls.days).filter(function (d) { return d >= from; }).sort();
+    next.startDate = settings().startDate || null;
+    next.answered = Object.keys(S.ls.states).reduce(function (n, id) { const st = S.ls.states[id]; return n + (st.correct || 0) + (st.wrong || 0); }, 0);
+    next.dueCount = refreshIds().length;
     if (L.sameDigest(next, S.digest)) return;
     digestBusy = true;
     try { await S.db.doc('digest/' + S.uid).set(next); S.digest = next; }
@@ -991,8 +1011,9 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     render();
     startTimer();
     subPrivate();
-    subWindow();
-    loadSide();
+    // The admin's settings (corrections, notice, default times) come first, so facts are shown corrected.
+    S.db.doc('config/public').get().then(function (snap) { S.pub = snap.exists ? (snap.data() || {}) : {}; }, function () { S.pub = {}; })
+      .then(function () { C.content.setOverrides(S.pub.overrides); subWindow(); loadSide(); });
   }
   function startTimer() {
     clearTimeout(S.loadTimer);
@@ -1027,7 +1048,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       S.server = server;
       overlay();
       arrived('priv', snap);
-      if (!snap.metadata.fromCache) touchMember();
+      if (!snap.metadata.fromCache) { touchMember(); ensureStartDate(); if (S.digestLoaded) touchDigest(); }
     }, failed('priv'));
   }
   function subWindow() {
@@ -1039,6 +1060,14 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       S.win = win;
       arrived('win', { metadata: { fromCache: false } });
     }, failed('win'));
+  }
+  function ensureStartDate() {
+    // Catch-up never reaches back before the first day someone used Lumen, so late joiners start fresh.
+    if (settings().startDate) return;
+    let first = today();
+    Object.keys(S.ls.states).forEach(function (id) { const d = L.dateOfISO(S.ls.states[id].seenAt); if (d && d < first) first = d; });
+    Object.keys(S.ls.days).forEach(function (d) { if (d < first) first = d; });
+    writePriv('settings', { startDate: first });
   }
   let memberDone = false;
   function touchMember() {
@@ -1067,6 +1096,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       S.digest = s.exists ? clone(s.data()) : null;
       S.lists = { reports: (S.digest && Array.isArray(S.digest.reports)) ? S.digest.reports.slice() : [], research: [] };
       S.digestLoaded = true;
+      touchDigest();
       scheduleRender();
     }).catch(quiet);
   }
@@ -1218,7 +1248,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     const t = today();
     return {
       quiz: L.selectVortag(S.ls.states, t, L.quizBudget(dayRec())).length,
-      catchup: L.selectCatchup(windowFacts(), S.ls.states, t).length
+      catchup: L.selectCatchup(windowFacts(), S.ls.states, t, settings().startDate).length
     };
   }
   const refreshIds = function () { return L.selectRefresh(S.ls.states, today(), !!dayRec().quizDone); };
@@ -1231,7 +1261,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     raf = setTimeout(function () { raf = 0; render(); }, 16);
   }
   function render() {
-    let line = 'Lumen';
+    let line = '';
     if (S.phase === 'ready') {
       line = L.statusLine(L.streak(S.ls.days, today()), L.learnedCount(S.ls.states));
       if (S.stale) line += ' · Stand vielleicht nicht aktuell';
@@ -1300,6 +1330,11 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     root.textContent = '';
     root.appendChild(h('h1', { class: 'viewtitle', text: L.formatDay(today(), { long: true }) }));
     if (S.phase !== 'ready' || !S.seen.win) { root.appendChild(stateCard()); return; }
+    const notice = S.pub && S.pub.notice;
+    if (notice && notice.text && notice.at !== settings().noticeSeen) {
+      root.appendChild(h('div', { class: 'card notice' }, h('p', { class: 'label', text: 'Mitteilung' }), h('p', { class: 'text', text: notice.text }),
+        btn('Ausblenden', 'quiet', function () { writePriv('settings', { noticeSeen: notice.at }); })));
+    }
     const model = todayModel();
     if (S.flow && S.flow.type === 'quiz') { append(root, quizCard(S.flow, 'flow')); return; }
     if (S.flow && S.flow.type === 'read' && !factById(S.flow.ids[S.flow.index])) S.flow = null;
@@ -1347,7 +1382,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
       btn('Zufällig üben', 'primary', function () { S.tab = 'practice'; startQuiz('random', 'pflow'); }, S.busy || !L.learnedCount(S.ls.states)));
   }
   function startCatchup() {
-    const ids = L.selectCatchup(windowFacts(), S.ls.states, today()).map(function (f) { return f.id; });
+    const ids = L.selectCatchup(windowFacts(), S.ls.states, today(), settings().startDate).map(function (f) { return f.id; });
     if (!ids.length) return;
     S.flow = { type: 'read', kind: 'catchup', ids: ids, index: 0 };
     render();
@@ -1481,7 +1516,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     const f = flow.facts[flow.index], ok = i === f.quiz.correct, t = today();
     flow.chosen = i;
     flow.results.push(ok);
-    saveState(f.id, L.afterAnswer(S.ls.states[f.id] || { area: f.area }, ok, nowISO(), t));
+    saveState(f.id, L.afterAnswer(S.ls.states[f.id] || { area: f.area }, ok, nowISO(), t, flow.kind));
     const cur = (((S.priv.stats || {}).areas || {})[f.area] || {}).recent;
     const patch = { areas: {}, updatedAt: nowISO() };
     patch.areas[f.area] = { recent: L.pushRecent(cur, ok) };
@@ -1627,6 +1662,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     const close = function () { closeSheet(sheet); };
     sheet.scrim = h('div', { class: 'scrim', style: 'z-index:' + (40 + level * 2), onclick: close });
     sheet.panel = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, style: 'z-index:' + (41 + level * 2) },
+      h('div', { class: 'grab', 'aria-hidden': 'true' }),
       h('div', { class: 'sheethead' }, h('h2', { id: titleId, text: title }),
         h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Schließen', html: ICON.close, onclick: close })), body);
     sheet.draw = function () { const y = body.scrollTop; body.textContent = ''; append(body, build(sheet)); body.scrollTop = y; };
@@ -1635,7 +1671,44 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     S.sheets.push(sheet);
     sheet.draw();
     sheet.panel.querySelector('.iconbtn').focus();
+    dragToClose(sheet);
     return sheet;
+  }
+  /* Swipe a sheet down to close it: from the handle or header, or from the content when it is scrolled to the top. */
+  function dragToClose(sheet) {
+    const panel = sheet.panel;
+    let y0 = null, x0 = 0, dy = 0, t0 = 0, active = false;
+    panel.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      const inBody = sheet.body.contains(e.target);
+      if (inBody && (sheet.body.scrollTop > 0 || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; t0 = Date.now(); active = false;
+    }, { passive: true });
+    panel.addEventListener('touchmove', function (e) {
+      if (y0 === null) return;
+      const ty = e.touches[0].clientY - y0, tx = e.touches[0].clientX - x0;
+      if (!active) {
+        if (Math.abs(tx) > Math.abs(ty) || ty < 6) { if (ty < -6 || Math.abs(tx) > 10) y0 = null; return; }
+        active = true;
+        panel.classList.add('dragging');
+      }
+      dy = Math.max(0, ty);
+      panel.style.transform = 'translateY(' + dy + 'px)';
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    const end = function () {
+      if (y0 === null) return;
+      y0 = null;
+      if (!active) return;
+      panel.classList.remove('dragging');
+      const fast = dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.5;
+      if (dy > Math.min(140, panel.offsetHeight * 0.3) || fast) {
+        panel.style.transform = 'translateY(100%)';
+        setTimeout(function () { closeSheet(sheet); }, 180);
+      } else panel.style.transform = '';
+    };
+    panel.addEventListener('touchend', end);
+    panel.addEventListener('touchcancel', end);
   }
   function closeSheet(sheet) {
     const i = S.sheets.indexOf(sheet);
@@ -1880,6 +1953,26 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     });
   });
   $('btnProgress').addEventListener('click', function () { if (S.phase === 'ready') openProgress(); });
+  /* Swipe left or right on the page to move between Heute, Üben and Archiv. */
+  (function () {
+    const order = ['today', 'practice', 'archive'];
+    let x0 = null, y0 = 0, t0 = 0;
+    $('main').addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1 || S.phase !== 'ready' || e.target.closest('.chips, input, textarea, .options')) { x0 = null; return; }
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+    }, { passive: true });
+    $('main').addEventListener('touchend', function (e) {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) < 70 || Math.abs(dx) < 1.8 * Math.abs(dy) || Date.now() - t0 > 600) return;
+      const i = order.indexOf(S.tab) + (dx < 0 ? 1 : -1);
+      if (i < 0 || i >= order.length) return;
+      S.tab = order[i];
+      render();
+      scrollTop();
+    }, { passive: true });
+  })();
   let searchTimer = 0;
   $('archiveSearch').addEventListener('input', function (e) {
     clearTimeout(searchTimer);

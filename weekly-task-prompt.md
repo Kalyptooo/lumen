@@ -52,6 +52,7 @@ Die Vorgaben des Admins liest du aus der Datenbank, die dafür öffentlich lesba
 - Keine Doppelungen: Dasselbe Thema nie zweimal. Der Lagebericht zeigt die vergebenen Themen je Bereich, `build` prüft zusätzlich gegen alle bisherigen Schlagwörter.
 - Abwechslung: Schwierigkeit mischen, Unterthemen rotieren, am selben Tag nie dasselbe Unterthema.
 - Fakten vom Typ erklaert („Wie funktioniert das?“) bestehen aus drei bis vier Sätzen.
+- **Quizfragen fragen nach Verständnis, nicht nach Zahlen** (gilt für alle Fakten ab dem 11. Dezember 2026). Frag nach dem Warum, dem Wie, der Folge oder danach, was in einer Alltagssituation richtig ist: „Warum beschlägt das Glas?“, „Was passiert, wenn …?“, „Was solltest du in dieser Lage tun?“. Fragen nach einer Zahl, einem Jahr, einer Frist, einer Dauer oder einem Betrag („Wie viele …“, „In welchem Jahr …“, „Wie lange …“) sind höchstens einmal pro Tag erlaubt und nur, wenn die Zahl der Kern des Fakts ist; `build` lehnt einen Tag mit mehr als einer solchen Frage ab. Die Zahl darf im Text stehen, die Frage zielt aber auf das Verständnis dahinter.
 - Quizfragen prüfen Verständnis, nicht Wortlaut. Eine Option ist klar richtig, drei sind plausibel, aber eindeutig falsch. Plausibel heißt: Wer den Fakt nicht kennt, könnte jede der vier Optionen für richtig halten. Nimm als falsche Optionen verbreitete Irrtümer, verwandte Begriffe oder benachbarte Werte, nie Unsinn, Scherze oder Füller wie „Nie“ und „Gar nicht“. Schlecht: „Vom Mond“, „Sie gelten nur am Wochenende“. Gut: bei 100.000 Euro die Werte 20.000, 50.000 und 500.000 Euro, bei einem Denkfehler drei andere Denkfehler. Alle vier Optionen sind ähnlich lang und gleich gebaut, die richtige fällt nicht auf. Lies vor `build` jede Frage noch einmal einzeln und ersetze jede falsche Option, die niemand ernsthaft wählen würde. Nenne in Frage und Erklärung nie die Position einer Option („die erste Antwort“): Das Skript verteilt die Position der richtigen Antwort gleichmäßig.
 - Sprache: Hochdeutsch wie in Österreich üblich (Jänner, Faschiertes), Anrede „du“, ruhiger und klarer Ton, Sätze unter 25 Wörtern, keine Emojis, keine Floskeln.
 - Berücksichtige die Vorgaben: Den Themenwunsch stärker gewichten (als Themenwahl innerhalb der Planzellen). Wiederhole nie denselben Fakt.
@@ -99,7 +100,9 @@ Die Fakten sind zeitlos. Aktuelles steht in einer eigenen Rubrik, die du in jede
 
 Ist nur eine einzelne Seite gesperrt, nimm eine andere, erreichbare Quelle. Als Quelle nennst du nur Seiten, die du geöffnet hast.
 
-### Teil A: Fehlermeldungen (zuerst)
+### Teil A: Korrekturen des Admins und Fehlermeldungen (zuerst)
+
+Führe zuerst `node tools/lumen-weekly.mjs overrides --admin out-admin.json` aus. Das übernimmt Korrekturen und ausgeblendete Fakten, die der Admin auf der Admin-Seite gemacht hat, dauerhaft in die Tagesdateien. Prüfe diese Korrekturen nicht erneut, sie sind gewollt.
 
 Für jede offene Meldung aus dem Lagebericht: prüfen und korrigieren oder zurückziehen wie oben beschrieben. Danach `reportsHandledUntil` in `out/run.json` eintragen, `node tools/lumen-weekly.mjs apply` ausführen und committen und pushen (`git add data && git commit -m "Fehlerprüfung <Datum>" && git push origin HEAD:main`).
 

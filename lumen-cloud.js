@@ -11,8 +11,20 @@
   /* ---------- static content ---------- */
 
   function makeContent(base) {
-    let manifest = null, manifestAt = 0, manifestReq = null;
+    let manifest = null, manifestAt = 0, manifestReq = null, overrides = {};
     const cache = {};
+    // Admin corrections (config/public.overrides) are laid over the published facts: { factId: { retired, title, text, … } }.
+    function patch(doc) {
+      if (!doc || !doc.items) return doc;
+      let out = null;
+      Object.keys(doc.items).forEach(function (k) {
+        const f = doc.items[k], o = f && overrides[f.id];
+        if (!o) return;
+        out = out || Object.assign({}, doc, { items: Object.assign({}, doc.items) });
+        out.items[k] = Object.assign({}, f, o);
+      });
+      return out || doc;
+    }
     const v = function () { return manifest && manifest.updatedAt ? '?v=' + encodeURIComponent(manifest.updatedAt) : ''; };
     function getJSON(url, fresh) {
       return fetch(url, { cache: fresh ? 'no-cache' : 'default' }).then(function (r) {
@@ -42,15 +54,16 @@
     const has = function (list, name) { return Array.isArray(list) && list.indexOf(name) !== -1; };
     return {
       manifest: loadManifest,
+      setOverrides: function (o) { overrides = o && typeof o === 'object' ? o : {}; },
       day: function (date) {
-        return loadManifest().then(function (m) { return has(m.days, date) ? file('facts', date) : null; });
+        return loadManifest().then(function (m) { return has(m.days, date) ? file('facts', date).then(patch) : null; });
       },
       range: function (from, to) {
         return loadManifest().then(function (m) {
           const dates = (m.days || []).filter(function (d) { return d >= from && d <= to; });
           return Promise.all(dates.map(function (d) { return file('facts', d); })).then(function (docs) {
             const win = {};
-            docs.forEach(function (doc) { if (doc && doc.date) win[doc.date] = doc; });
+            docs.forEach(function (doc) { if (doc && doc.date) win[doc.date] = patch(doc); });
             return win;
           });
         });
@@ -58,13 +71,13 @@
       before: function (date, n) {
         return loadManifest().then(function (m) {
           const dates = (m.days || []).filter(function (d) { return d <= date; }).sort().reverse().slice(0, n);
-          return Promise.all(dates.map(function (d) { return file('facts', d); })).then(function (docs) { return docs.filter(Boolean); });
+          return Promise.all(dates.map(function (d) { return file('facts', d).then(patch); })).then(function (docs) { return docs.filter(Boolean); });
         });
       },
       upTo: function (date) {
         return loadManifest().then(function (m) {
           const dates = (m.days || []).filter(function (d) { return d <= date; }).sort();
-          return Promise.all(dates.map(function (d) { return file('facts', d); })).then(function (docs) { return docs.filter(Boolean); });
+          return Promise.all(dates.map(function (d) { return file('facts', d).then(patch); })).then(function (docs) { return docs.filter(Boolean); });
         });
       },
       idx: function () {
