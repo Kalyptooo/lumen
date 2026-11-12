@@ -486,6 +486,13 @@ export function buildFacts(plan, draft, db, versions = {}) {
     const res = validateFact(f);
     for (const e of res.errors) errors.push(`${k}: ${e}`);
     for (const w of res.warnings) warnings.push(`${k}: ${w}`);
+    if (f.date >= UNDERSTANDING_FROM && !f.quizAlt) errors.push(`${k}: Zweitfrage (quizAlt) fehlt. Ab ${UNDERSTANDING_FROM} hat jeder Fakt zwei Fragen`);
+    if (f.quizAlt) {
+      const r2 = validateFact({ ...f, quiz: f.quizAlt });
+      for (const e of r2.errors) if (/^Quiz/.test(e)) errors.push(`${k}: Zweitfrage: ${e}`);
+      for (const w of r2.warnings) if (/^Quiz/.test(w)) warnings.push(`${k}: Zweitfrage: ${w}`);
+      if (f.quiz && f.quizAlt && normText(f.quiz.question || '') === normText(f.quizAlt.question || '')) errors.push(`${k}: Zweitfrage ist gleich wie die erste Frage`);
+    }
     if (f.area === 'erklaert' && typeof f.text === 'string') {
       const n = sentences(f.text).length;
       if (n < 3 || n > 4) warnings.push(`${k}: „Wie funktioniert das?“ hat ${n} Sätze (Ziel: drei bis vier)`);
@@ -493,7 +500,11 @@ export function buildFacts(plan, draft, db, versions = {}) {
   }
   for (const c of plan.cells) if (!seen[key(c)]) errors.push(`${key(c)} (${c.area}): fehlt im Entwurf`);
   const numberQ = {};
-  for (const f of Object.values(seen)) if (f.date >= UNDERSTANDING_FROM && isNumberQuestion(f.quiz)) (numberQ[f.date] ||= []).push(f.slot);
+  for (const f of Object.values(seen)) {
+    if (f.date < UNDERSTANDING_FROM) continue;
+    if (isNumberQuestion(f.quiz)) (numberQ[f.date] ||= []).push(f.slot);
+    if (f.quizAlt && isNumberQuestion(f.quizAlt)) (numberQ[f.date] ||= []).push(f.slot + ' (Zweitfrage)');
+  }
   for (const [d, slots] of Object.entries(numberQ)) {
     if (slots.length > 1) errors.push(`${d}: ${slots.length} Quizfragen nach Zahlen oder Daten (Plätze ${slots.join(', ')}). Höchstens eine pro Tag, die anderen nach Verständnis fragen`);
   }
@@ -536,12 +547,16 @@ export function buildFacts(plan, draft, db, versions = {}) {
     if (NOTE_AREAS.includes(c.area)) f.note = NOTE;
     else if (typeof d.note === 'string' && d.note.trim()) f.note = d.note.trim();
     f.quiz = { question: d.quiz.question.trim(), options: d.quiz.options.map((o) => o.trim()), correct: d.quiz.correct, explanation: d.quiz.explanation.trim() };
+    if (d.quizAlt) f.quizAlt = { question: d.quizAlt.question.trim(), options: d.quizAlt.options.map((o) => o.trim()), correct: d.quizAlt.correct, explanation: d.quizAlt.explanation.trim() };
     f.createdAt = createdAt;
     f.batch = plan.batch;
     f.kw = d.kw.trim();
     return f;
   }).sort((a, b) => (a.id < b.id ? -1 : 1));
   spreadCorrect(facts, plan.batch);
+  const alts = facts.filter((f) => f.quizAlt).map((f) => ({ owner: f, quiz: f.quizAlt }));
+  spreadCorrect(alts, plan.batch + '-alt');
+  for (const a of alts) a.owner.quizAlt = a.quiz;
 
   const days = {}, topics = {};
   for (const f of facts) {
@@ -763,7 +778,7 @@ function main(argv) {
       const item = doc.items && doc.items[id.slice(11)];
       if (!item || item.id !== id) continue;
       const next = { ...item };
-      for (const k of ['title', 'text', 'mnemonic', 'quiz', 'correction']) if (o[k] !== undefined) next[k] = o[k];
+      for (const k of ['title', 'text', 'mnemonic', 'quiz', 'quizAlt', 'correction']) if (o[k] !== undefined) next[k] = o[k];
       if (o.retired === true) next.retired = true; else if (o.retired === false) delete next.retired;
       if (JSON.stringify(next) === JSON.stringify(item)) continue;
       doc.items[id.slice(11)] = next;
