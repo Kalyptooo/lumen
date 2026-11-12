@@ -9,6 +9,7 @@
      node tools/lumen-weekly.mjs checkfact fakt.json    einen einzelnen (korrigierten) Fakt prüfen
      node tools/lumen-weekly.mjs correct <faktId> fix.json   gemeldeten Fakt im Archiv korrigieren (Felder + "summary")
      node tools/lumen-weekly.mjs retire <faktId>         gemeldeten Fakt im Archiv zurückziehen
+     node tools/lumen-weekly.mjs overrides --admin a.json Korrekturen des Admins in die Tagesdateien übernehmen
      node tools/lumen-weekly.mjs news [news.json]       Ausgabe „Aktuell“ prüfen und bauen
      node tools/lumen-weekly.mjs apply                  gebaute Dateien und Protokoll nach data/ übernehmen, Manifest neu bauen
      node tools/lumen-weekly.mjs check                  vorhandene Tagesdateien prüfen
@@ -216,6 +217,16 @@ function similar(a, b) {
 }
 const isUrl = (u) => /^https?:\/\/[^\s]+$/i.test(String(u || ''));
 
+/* Quizfragen, die nach einer Zahl, einem Jahr, einer Dauer oder einem Betrag fragen. Ab UNDERSTANDING_FROM höchstens eine pro Tag. */
+export const UNDERSTANDING_FROM = '2026-12-11';
+const NUMBER_Q = /^(wie (viele?|hoch|lange|alt|weit|schnell|groß|schwer|oft|teuer|warm|kalt|tief)|in welchem jahr|wann |seit wann|bis wann|ab welche[mrn]? |um wie viel|welche zahl|wie viel prozent)/i;
+export function isNumberQuestion(q) {
+  if (!q || typeof q.question !== 'string') return false;
+  if (NUMBER_Q.test(q.question.trim())) return true;
+  const opts = Array.isArray(q.options) ? q.options : [];
+  return opts.length === 4 && opts.filter((o) => /[0-9]/.test(String(o))).length >= 3;
+}
+
 /* Einen Fakt des Entwurfs prüfen. Liefert { errors, warnings }. */
 export function validateFact(f) {
   const errors = [], warnings = [];
@@ -255,6 +266,7 @@ export function validateFact(f) {
       }
     }
     if (!Number.isInteger(q.correct) || q.correct < 0 || q.correct > 3) errors.push('Quiz: correct muss 0 bis 3 sein');
+    if (isNumberQuestion(q)) warnings.push('Quiz fragt nach einer Zahl, einem Datum oder einer Dauer. Besser nach Verständnis fragen: warum, wie, was folgt daraus, was ist in dieser Lage richtig');
     if (!str(q.explanation)) errors.push('Quiz: Erklärung fehlt');
     else if (sentences(q.explanation).length > 1) warnings.push('Quiz: Erklärung hat mehr als einen Satz');
   }
@@ -480,6 +492,11 @@ export function buildFacts(plan, draft, db, versions = {}) {
     }
   }
   for (const c of plan.cells) if (!seen[key(c)]) errors.push(`${key(c)} (${c.area}): fehlt im Entwurf`);
+  const numberQ = {};
+  for (const f of Object.values(seen)) if (f.date >= UNDERSTANDING_FROM && isNumberQuestion(f.quiz)) (numberQ[f.date] ||= []).push(f.slot);
+  for (const [d, slots] of Object.entries(numberQ)) {
+    if (slots.length > 1) errors.push(`${d}: ${slots.length} Quizfragen nach Zahlen oder Daten (Plätze ${slots.join(', ')}). Höchstens eine pro Tag, die anderen nach Verständnis fragen`);
+  }
 
   const replaced = new Set(plan.replace || []);
   const oldTitles = {}, oldKw = [];
@@ -733,6 +750,29 @@ function main(argv) {
     console.log(`OK: ${id} ${cmd === 'retire' ? 'zurückgezogen' : 'korrigiert'} in ${file}.`);
     return 0;
   }
+  if (cmd === 'overrides') {
+    // Admin corrections (config/public.overrides) are applied to the day files so they become permanent.
+    const admin = loadAdmin(opt.admin);
+    const ov = (admin && admin.overrides) || {};
+    let changed = 0;
+    for (const [id, o] of Object.entries(ov)) {
+      if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}-[1-5]$/.test(id) || !o || typeof o !== 'object') continue;
+      const file = path.join(dbDir, 'facts', `${id.slice(0, 10)}.json`);
+      if (!fs.existsSync(file)) continue;
+      const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const item = doc.items && doc.items[id.slice(11)];
+      if (!item || item.id !== id) continue;
+      const next = { ...item };
+      for (const k of ['title', 'text', 'mnemonic', 'quiz', 'correction']) if (o[k] !== undefined) next[k] = o[k];
+      if (o.retired === true) next.retired = true; else if (o.retired === false) delete next.retired;
+      if (JSON.stringify(next) === JSON.stringify(item)) continue;
+      doc.items[id.slice(11)] = next;
+      fs.writeFileSync(file, JSON.stringify(doc) + String.fromCharCode(10));
+      changed += 1;
+    }
+    console.log(`OK: ${changed} Korrektur${changed === 1 ? '' : 'en'} des Admins in die Tagesdateien übernommen.`);
+    return 0;
+  }
   if (cmd === 'apply') {
     if (!fs.existsSync(runFile)) { console.log('out/run.json fehlt: zuerst status ausführen.'); return 1; }
     let copied = 0;
@@ -822,7 +862,7 @@ function main(argv) {
     console.log(`Protokollwert: newsDate=${plan.today}`);
     return 0;
   }
-  console.log('Befehle: today | status | build | checkfact | correct | retire | news | apply | check');
+  console.log('Befehle: today | status | build | checkfact | correct | retire | overrides | news | apply | check');
   return 1;
 }
 
