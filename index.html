@@ -333,6 +333,19 @@ details.more summary::-webkit-details-marker { display: none; }
 details.more summary::after { content: '+'; color: var(--muted); font-size: 1.25rem; font-weight: 400; }
 details.more[open] summary::after { content: '–'; }
 details.more > div { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .view > .card, .view > .choices, .view > article, .view > .daybar { animation: enter .22s ease-out; }
+  @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .option, .btn, .seg-item, .choice, .lineitem { transition: background-color .15s, border-color .15s, transform .1s; }
+  .btn:active, .choice:active, .option:active { transform: scale(.985); }
+}
+.welcome { display: flex; align-items: center; gap: 14px; }
+.welcome img { width: 56px; height: 56px; border-radius: 14px; flex: none; }
+.skeleton i { display: block; height: 14px; border-radius: 7px; background: var(--surface-2); }
+.skeleton i.big { height: 26px; margin-bottom: 6px; }
+@media (prefers-reduced-motion: no-preference) { .skeleton i { animation: pulse 1.2s ease-in-out infinite alternate; } @keyframes pulse { to { opacity: .45; } } }
+.links { display: flex; justify-content: center; gap: 24px; }
+.newsitem .meta .grow { flex: 1; }
 .authlinks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .formerror { color: var(--danger); font-size: .875rem; }
 .field input[type="file"] { padding: 10px; }
@@ -379,7 +392,6 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="lumen-cloud.js"></script>
 <script id="lumen-logic">
@@ -1336,8 +1348,8 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
         msg, btn(F.busy ? 'Einen Moment …' : 'Link senden', 'primary', function () { authAction('reset'); }, F.busy),
         h('div', { class: 'authlinks' }, btn('Zurück zur Anmeldung', 'link', function () { setForm({ mode: 'login', error: '', info: '' }); })));
     }
-    return h('div', { class: 'card' }, h('h2', { class: 'title', text: 'Anmelden' }),
-      h('p', { class: 'lead', text: 'Fünf Fakten am Tag, ein kurzes Quiz und Auffrischung.' }),
+    return h('div', { class: 'card' }, h('div', { class: 'welcome' }, h('img', { src: 'icon.svg', alt: '', width: '56', height: '56' }),
+        h('div', {}, h('h2', { class: 'title', text: 'Lumen' }), h('p', { class: 'lead', text: 'Fünf Fakten am Tag, ein kurzes Quiz und Auffrischung.' }))),
       authField('E-Mail', 'email', 'email', 'username'),
       authField('Passwort', 'password', 'password', 'current-password'),
       msg, btn(F.busy ? 'Einen Moment …' : 'Anmelden', 'primary', function () { authAction('login'); }, F.busy),
@@ -1437,14 +1449,14 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     S.sheets.forEach(function (s) { if (s.live) s.draw(); });
   }
   function stateCard() {
-    if (S.phase === 'signin') return authCard();
+    if (S.phase === 'signin') { $('viewTitle').textContent = ''; $('statusLine').textContent = ''; return authCard(); }
     if (S.phase === 'verify') return verifyCard();
     if (S.phase === 'denied') return deniedCard();
     if (S.phase === 'error') {
       return h('div', { class: 'card' }, h('h2', { class: 'title', text: 'Die Daten sind gerade nicht erreichbar' }),
         h('p', { class: 'lead', text: 'Prüfe deine Verbindung und versuche es noch einmal.' }), btn('Erneut versuchen', 'primary', retry));
     }
-    return h('div', { class: 'card' }, h('p', { class: 'lead', text: 'Deine Fakten werden geladen …' }));
+    return h('div', { class: 'card skeleton', 'aria-label': 'Lädt', role: 'status' }, h('i', { style: 'width:30%' }), h('i', { class: 'big', style: 'width:80%' }), h('i'), h('i'), h('i', { style: 'width:60%' }));
   }
   function starButton(f, st) {
     const on = !!(st && st.starred);
@@ -1916,18 +1928,17 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       else if (f.correction && f.correction.at) notes.push('Korrigiert am ' + L.formatDay(String(f.correction.at).slice(0, 10), { year: true }) + (f.correction.summary ? ': ' + f.correction.summary : ''));
       if (status === 'offen' || status === 'geprueft') notes.push(L.reportStatusText(status, f));
       const state = L.isKnown(st) ? 'als bekannt markiert' : (L.isSeen(st) ? 'gelesen' : 'noch nicht gelesen');
-      return h('article', { class: 'card' }, factBody(f, st),
-        h('p', { class: 'note', text: L.formatDay(f.date, { long: true, year: true }) + ' · ' + state }),
-        notes.map(function (n) { return h('p', { class: 'statusnote', text: n }); }),
-        !f.retired && !L.isHandled(st) ? btn('Als gelesen markieren', 'primary', function () {
-          saveState(f.id, L.afterRead(st, nowISO(), today(), f.area)); bumpRead(f.area); touchDigest();
-        }) : null,
-        h('div', { class: 'row' },
-          btn(L.isKnown(st) ? 'Doch nicht bekannt' : 'Kenn ich schon', 'secondary', function () {
+      return [h('article', { class: 'card' }, factBody(f, st, true),
+          h('p', { class: 'note', text: L.formatDay(f.date, { long: true, year: true }) + ' · ' + state }),
+          notes.map(function (n) { return h('p', { class: 'statusnote', text: n }); }),
+          !f.retired && !L.isHandled(st) ? btn('Als gelesen markieren', 'primary', function () {
+            saveState(f.id, L.afterRead(st, nowISO(), today(), f.area)); bumpRead(f.area); touchDigest();
+          }) : null),
+        h('div', { class: 'links' },
+          btn(L.isKnown(st) ? 'Doch nicht bekannt' : 'Kenn ich schon', 'link', function () {
             saveState(f.id, L.isKnown(st) ? L.afterUnknown(st, today()) : L.afterKnown(st, nowISO(), f.area)); bumpRead(f.area); touchDigest();
           }),
-          btn('Frag Claude dazu', 'secondary', function () { openAsk(askOfFact(f)); })),
-        btn('Fehler melden', 'link', function () { openReport(f); }));
+          btn('Fehler melden', 'link', function () { openReport(f); }))];
     }, true);
     return sheet;
   }
@@ -1997,15 +2008,15 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     const sheet = openSheet('Aktuell', function () {
       const out = [];
       if (shown) {
-        out.push(h('p', { class: 'hint', text: 'Stand ' + L.formatDay(shown.date, { year: true }) + '. Die Rubrik erscheint sonntags neu und ist nicht tagesaktuell.' }));
+        out.push(h('p', { class: 'hint', text: 'Ausgabe vom ' + L.formatDay(shown.date, { long: true }) + ' · erscheint jeden Sonntag' }));
         out.push(h('div', {}, shown.items.map(function (n) {
           return h('div', { class: 'newsitem' },
             h('div', { class: 'meta' }, h('span', { class: 'chip plain', text: L.NEWS_AREAS[n.area] || n.area }),
               h('span', { text: (n.upcoming ? 'gilt ab ' : '') + L.formatDay(n.date, { year: true }) })),
             h('h3', { text: n.title }), h('p', { class: 'text', text: n.text }),
             n.note ? h('p', { class: 'note', text: n.note }) : null,
-            h('div', { class: 'meta' }, sourceLink(n.source)),
-            btn('Frag Claude dazu', 'link', function () { openAsk(askOfNews(n)); }));
+            h('div', { class: 'meta' }, sourceLink(n.source), h('span', { class: 'grow' }),
+              h('button', { class: 'iconbtn small', type: 'button', html: ICON.ask, 'aria-label': 'Frag Claude dazu', onclick: function () { openAsk(askOfNews(n)); } })));
         })));
       } else out.push(h('p', { class: 'empty', text: 'Noch keine Ausgabe vorhanden. Die erste kommt mit der nächsten Wochenladung.' }));
       if (pick && pick.earlier.length) {
@@ -2030,7 +2041,17 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     if (pushBusy) return;
     pushBusy = true; redraw();
     try {
-      if (!C.messaging || !('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
+      if (!C.messaging) {
+        await new Promise(function (resolve, reject) {
+          const sc = document.createElement('script');
+          sc.src = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js';
+          sc.onload = resolve; sc.onerror = reject;
+          document.head.appendChild(sc);
+        });
+        C.messaging = C.firebase && C.firebase.messaging ? C.firebase.app().messaging() : null;
+        if (!C.messaging) throw new Error('unsupported');
+      }
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') { toast('Ohne deine Erlaubnis kann Lumen nicht erinnern. Du kannst sie in den iPhone-Einstellungen bei Lumen erteilen.'); pushBusy = false; redraw(); return; }
       const reg = await navigator.serviceWorker.ready;
@@ -2046,7 +2067,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   async function disablePush(redraw) {
     writePriv('settings', { push: false });
     try { await S.db.doc('push/' + S.uid).delete(); } catch (e) { /* ignore */ }
-    try { if (C.messaging) await C.messaging.deleteToken(); } catch (e) { /* ignore */ }
+    try { if (C.messaging) await C.messaging.deleteToken(); } catch (e) { /* the token expires on its own */ }
     toast('Erinnerungen sind aus.');
     redraw();
   }
