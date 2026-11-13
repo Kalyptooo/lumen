@@ -56,6 +56,7 @@
 html { height: 100%; box-sizing: border-box; font-size: 106.25%; -webkit-text-size-adjust: 100%; }
 @supports (font: -apple-system-body) { html { font: -apple-system-body; } }
 *, *::before, *::after { box-sizing: inherit; }
+details > * { box-sizing: border-box; }
 body {
   height: 100%; height: 100dvh; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); overscroll-behavior: none;
   font-family: var(--font-ui); font-size: 1rem; line-height: 1.5; -webkit-tap-highlight-color: transparent;
@@ -255,10 +256,10 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .sheet.dragging { transition: none; }
 .sheethead h2 { font-size: 1.0625rem; font-weight: 650; overflow-wrap: anywhere; }
 .sheetbody {
-  overflow-y: auto; -webkit-overflow-scrolling: touch; padding-block: 6px 28px; display: flex; flex-direction: column; gap: 16px;
+  overflow-y: auto; overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-block: 6px 28px; display: flex; flex-direction: column; gap: 16px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 13px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 13px; }
 .seg button { min-height: 44px; padding: 4px 6px; border: 0; border-radius: 10px; background: transparent; font-size: .875rem; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 650; }
 .section { display: flex; flex-direction: column; gap: 10px; }
@@ -268,7 +269,9 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .arearow .line span { color: var(--muted); font-size: .8125rem; font-variant-numeric: tabular-nums; text-align: right; }
 .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
-.times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.times { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.times .field { min-width: 0; }
+.field input[type="time"] { min-width: 0; -webkit-appearance: none; appearance: none; text-align: left; padding-inline: 10px; }
 .switchrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .switchrow input { width: 52px; height: 32px; accent-color: var(--accent); }
 .newsitem { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
@@ -348,7 +351,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
 .newsitem .meta .grow { flex: 1; }
 .authlinks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .formerror { color: var(--danger); font-size: .875rem; }
-.field input[type="file"] { padding: 10px; }
+.field input[type="file"] { padding: 10px; min-width: 0; max-width: 100%; overflow: hidden; }
 </style>
 </head>
 <body>
