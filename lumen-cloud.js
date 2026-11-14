@@ -131,5 +131,34 @@
     }
   } catch (e) { out.ready = false; }
 
+  /* Error reports reach the weekly task only through config/public.reports (readable without signing in, no names).
+     Every page an admin opens forwards new reports from the people's digests; for everyone else the first read is refused. */
+  out.forwardReports = function () {
+    const db = out.db;
+    if (!db) return Promise.resolve(0);
+    return db.doc('config/access').get().then(function () {
+      return Promise.all([db.doc('config/public').get(), db.collection('digest').get(), out.content.manifest(true)]);
+    }).then(function (got) {
+      const pub = got[0].exists ? (got[0].data() || {}) : {};
+      const until = (got[2] && got[2].reportsHandledUntil) || '';
+      const open = function (r) { return !!(r && r.factId && r.reportedAt) && !(until && r.reportedAt <= until); };
+      const key = function (r) { return r.factId + '|' + r.reportedAt; };
+      const keep = (Array.isArray(pub.reports) ? pub.reports : []).filter(open);
+      const seen = {};
+      keep.forEach(function (r) { seen[key(r)] = true; });
+      const add = [];
+      got[1].docs.forEach(function (d) {
+        ((d.data() || {}).reports || []).forEach(function (r) {
+          if (!open(r) || seen[key(r)]) return;
+          seen[key(r)] = true;
+          add.push({ factId: String(r.factId), note: String(r.note || '').slice(0, 200), reportedAt: String(r.reportedAt) });
+        });
+      });
+      if (!add.length) return 0;
+      return db.doc('config/public').set({ reports: keep.concat(add).slice(-60), updatedAt: new Date().toISOString() }, { merge: true })
+        .then(function () { return add.length; });
+    });
+  };
+
   window.LumenCloud = out;
 })();

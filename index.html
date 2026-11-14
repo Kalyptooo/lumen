@@ -273,7 +273,17 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .times .field { min-width: 0; }
 .field input[type="time"] { min-width: 0; -webkit-appearance: none; appearance: none; text-align: left; padding-inline: 10px; }
 .switchrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
-.switchrow input { width: 52px; height: 32px; accent-color: var(--accent); }
+.switchrow input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; flex: none; margin: 0; width: 51px; height: 31px; border-radius: 16px; cursor: pointer;
+  border: 1px solid var(--line); background-color: var(--line);
+  background-image: radial-gradient(circle at 15px 50%, #ffffff 0 12px, transparent 12.5px);
+}
+.switchrow input[type="checkbox"]:checked {
+  border-color: var(--accent); background-color: var(--accent);
+  background-image: radial-gradient(circle at calc(100% - 15px) 50%, var(--on-accent) 0 12px, transparent 12.5px);
+}
+.switchrow input[type="checkbox"]:disabled { opacity: .4; cursor: default; }
+@media (prefers-reduced-motion: no-preference) { .switchrow input[type="checkbox"] { transition: background-color .2s, border-color .2s; } }
 .newsitem { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .newsitem h3 { font-family: var(--font-read); font-size: 1.125rem; line-height: 1.3; font-weight: 600; overflow-wrap: anywhere; }
 .newsitem .meta { color: var(--muted); font-size: .8125rem; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
@@ -327,7 +337,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .choice small { color: var(--muted); font-size: .8125rem; }
 .choice svg { color: var(--muted); }
 .choice[disabled] { opacity: .5; cursor: default; }
-.areaselect { flex: none; min-height: 36px; padding: 4px 30px 4px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: .875rem; appearance: none; -webkit-appearance: none;
+.areaselect { flex: none; min-height: 36px; padding: 4px 30px 4px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: max(16px, .875rem); appearance: none; -webkit-appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: right 14px center, right 9px center; background-size: 5px 5px; background-repeat: no-repeat; }
 .areaselect.on { border-color: var(--accent); color: var(--accent); font-weight: 650; }
 details.more { border-top: 1px solid var(--line); padding-top: 12px; }
@@ -1239,6 +1249,8 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     S.db.doc('members/' + S.uid).set({
       email: u.email || '', name: u.displayName || '', lastSeen: today(), lastSeenAt: nowISO()
     }, { merge: true }).catch(function () { memberDone = false; });
+    if (settings().push === true) savePushTimes();
+    if (C.forwardReports) C.forwardReports().catch(function () { /* only admins may forward */ });
   }
   function loadSide() {
     const quiet = function () {};
@@ -1275,6 +1287,13 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   /* ---------- sign-in ---------- */
 
   function setForm(patch) { Object.assign(S.form, patch); render(); }
+  /* The links in the e-mails lead back to Lumen afterwards; if Firebase refuses that address, the e-mail goes out without it. */
+  function withReturn(send) {
+    return send({ url: PAGE_URL }).catch(function (e) {
+      if (e && /continue-uri|unauthorized-domain/.test(String(e.code))) return send();
+      throw e;
+    });
+  }
   async function authAction(kind) {
     const F = S.form;
     if (F.busy) return;
@@ -1289,10 +1308,10 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
         const cred = await C.auth.createUserWithEmailAndPassword(email, pw);
         const name = F.name.trim().slice(0, 40);
         if (name) await cred.user.updateProfile({ displayName: name });
-        await cred.user.sendEmailVerification();
+        await withReturn(function (o) { return cred.user.sendEmailVerification(o); });
         S.authUser = cred.user;
       } else {
-        await C.auth.sendPasswordResetEmail(email);
+        await withReturn(function (o) { return C.auth.sendPasswordResetEmail(email, o); });
         S.form.mode = 'login';
         S.form.info = 'Wenn es ein Konto mit dieser Adresse gibt, ist ein Link zum Zurücksetzen unterwegs. Schau auch im Spam-Ordner nach.';
       }
@@ -1319,7 +1338,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     const u = C.auth.currentUser;
     if (!u) return;
     setForm({ busy: true, error: '', info: '' });
-    try { await u.sendEmailVerification(); S.form.info = 'Neue E-Mail ist unterwegs. Schau auch im Spam-Ordner nach.'; }
+    try { await withReturn(function (o) { return u.sendEmailVerification(o); }); S.form.info = 'Neue E-Mail ist unterwegs. Schau auch im Spam-Ordner nach.'; }
     catch (e) { S.form.error = C.message(e); }
     S.form.busy = false;
     render();
@@ -1505,6 +1524,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
         btn('Ausblenden', 'link', function () { writePriv('settings', { noticeSeen: notice.at }); })));
     }
     const model = todayModel();
+    syncBlocksDone(model);
     if (S.flow && S.flow.type === 'quiz') { append(root, quizCard(S.flow, 'flow')); return; }
     if (S.flow && S.flow.type === 'read' && !factById(S.flow.ids[S.flow.index])) S.flow = null;
     append(root, dayBar(model));
@@ -1517,6 +1537,13 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     }
     if (S.flow) append(root, readCard(S.flow));
     append(root, laterList());
+  }
+  /* A stage whose facts were all marked elsewhere (archive, "Kenn ich schon") is recorded as done too. */
+  function syncBlocksDone(model) {
+    if (!S.fresh.priv) return;
+    const have = dayRec().blocksDone || [];
+    const missing = model.blocks.filter(function (b) { return b.done && have.indexOf(b.block) === -1; }).map(function (b) { return b.block; });
+    if (missing.length) saveDay(model.today, { blocksDone: uniq(have.concat(missing)), ts: nowISO() });
   }
   /* The three stages of the day as one quiet row: done, open, or the opening time. */
   function dayBar(model) {
@@ -1536,8 +1563,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       const ids = L.selectDaily(S.ls.states, today(), L.quizBudget(dayRec()));
       const fresh = ids.filter(function (id) { return L.firstQuizPending(S.ls.states[id]); }).length, older = ids.length - fresh;
       const sub = [];
-      if (fresh) sub.push(fresh + ' von zuletzt');
-      if (older) sub.push(older + ' ältere');
+      if (fresh && older) sub.push(fresh + ' zum ersten Mal', older + ' zum Auffrischen');
       return h('div', { class: 'card hero' }, h('p', { class: 'kicker', text: 'Zuerst' }),
         h('h2', { class: 'title', text: 'Wiederholung' }),
         h('p', { class: 'lead', text: (step.count === 1 ? '1 Frage' : step.count + ' Fragen') + (sub.length ? ' · ' + sub.join(', ') : '') }),
@@ -2052,7 +2078,10 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
           sc.onload = resolve; sc.onerror = reject;
           document.head.appendChild(sc);
         });
-        C.messaging = C.firebase && C.firebase.messaging ? C.firebase.app().messaging() : null;
+        try {
+          const ok = !C.firebase.messaging.isSupported || await C.firebase.messaging.isSupported();
+          C.messaging = ok ? C.firebase.app().messaging() : null;
+        } catch (e) { C.messaging = null; }
         if (!C.messaging) throw new Error('unsupported');
       }
       const perm = await Notification.requestPermission();
@@ -2078,7 +2107,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     const redraw = function () { S.sheets.forEach(function (sh) { sh.draw(); }); };
     const on = settings().push === true;
     return h('div', { class: 'switchrow' }, h('span', {}, 'Erinnerungen', h('small', { class: 'hint', style: 'display:block', text: on ? t.morgen + ', ' + t.mittag + ', ' + t.abend + ' Uhr' : (standalone() ? 'zu den Etappen, wenn noch etwas offen ist' : 'nur vom Home-Bildschirm aus') })),
-      h('input', { id: 'pushToggle', type: 'checkbox', checked: on, disabled: pushBusy || (!on && !standalone()), onchange: function (e) { if (e.target.checked) enablePush(redraw); else disablePush(redraw); } }));
+      h('input', { id: 'pushToggle', type: 'checkbox', role: 'switch', checked: on, disabled: pushBusy || (!on && !standalone()), onchange: function (e) { if (e.target.checked) enablePush(redraw); else disablePush(redraw); } }));
   }
   function pushSection(t) {
     const redraw = function () { S.sheets.forEach(function (sh) { sh.draw(); }); };
@@ -2108,7 +2137,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     friendTimer = setTimeout(function () {
       const w = weekStats();
       S.db.doc('friends/' + S.uid).set({
-        name: (S.authUser && S.authUser.displayName) || (S.authUser && S.authUser.email || '').split('@')[0],
+        name: firstName(),
         streak: w.streak, week: w.week, weekOf: w.monday, learned: w.learned, sure: w.sure, updatedAt: nowISO()
       }).catch(function () {});
     }, 1500);
@@ -2118,11 +2147,30 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     if (on) { publishFriend(); loadFriends(redraw); }
     else { S.friends = null; S.db.doc('friends/' + S.uid).delete().catch(function () {}); if (redraw) redraw(); }
   }
+  let friendsLoading = false;
   function loadFriends(redraw) {
+    if (friendsLoading) return;
+    friendsLoading = true;
     S.db.collection('friends').get().then(function (snap) {
       S.friends = snap.docs.map(function (d) { return Object.assign({ uid: d.id }, d.data()); });
+    }).catch(function () { S.friends = []; }).then(function () { friendsLoading = false; if (redraw) redraw(); });
+  }
+  const firstName = function () { return String((S.authUser && S.authUser.displayName) || '').trim().slice(0, 40); };
+  function nameField(redraw) {
+    return h('label', { class: 'field' }, h('span', { text: 'Vorname' }),
+      h('input', { id: 'nameInput', type: 'text', maxlength: '40', autocomplete: 'given-name', enterkeyhint: 'done', value: firstName(),
+        onchange: function (e) { saveName(e.target.value, redraw); } }));
+  }
+  function saveName(value, redraw) {
+    const name = String(value || '').trim().slice(0, 40), u = C.auth.currentUser;
+    if (!u || name === firstName()) return;
+    u.updateProfile({ displayName: name }).then(function () {
+      S.db.doc('members/' + S.uid).set({ name: name }, { merge: true }).catch(function () {});
+      publishFriend();
+      touchDigest();
+      toast(name ? 'Name gespeichert.' : 'Name entfernt.');
       if (redraw) redraw();
-    }).catch(function () { S.friends = []; if (redraw) redraw(); });
+    }, function (e) { toast(C.message(e)); });
   }
   function friendsView(redraw) {
     if (settings().friends !== true) {
@@ -2139,6 +2187,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     if (!list.some(function (f) { return f.uid === S.uid; })) list.push({ uid: S.uid, name: 'Du', week: w.week, learned: w.learned, streak: w.streak });
     const total = list.reduce(function (n, f) { return n + (f.week || 0); }, 0);
     return h('div', { class: 'section' },
+      firstName() ? null : h('div', { class: 'stack' }, h('p', { class: 'hint', text: 'Damit dich die anderen erkennen, trag deinen Vornamen ein.' }), nameField(redraw)),
       h('div', { class: 'weekline' }, h('b', { text: 'Gemeinsam diese Woche' }), h('span', { text: total + (total === 1 ? ' Fakt' : ' Fakten') + ' gelernt von ' + list.length + (list.length === 1 ? ' Person' : ' Personen') })),
       h('div', { class: 'friends' }, list.map(function (f, i) {
         return h('div', { class: 'friend' + (f.uid === S.uid ? ' me' : '') },
@@ -2249,7 +2298,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
           }))),
         h('div', { class: 'section' },
           h('label', { class: 'switchrow' }, h('span', { text: 'Haptik' }),
-            h('input', { id: 'hapticsToggle', type: 'checkbox', checked: hapticsOn(), onchange: function (e) {
+            h('input', { id: 'hapticsToggle', type: 'checkbox', role: 'switch', checked: hapticsOn(), onchange: function (e) {
               writePriv('settings', { haptics: !!e.target.checked });
               if (e.target.checked) setTimeout(function () { tick('single'); }, 0);
             } })),
@@ -2258,10 +2307,11 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
         h('details', { class: 'more' }, h('summary', { text: 'Konto und Daten' }),
           h('div', {},
             h('p', { class: 'hint', text: 'Angemeldet als ' + (u.email || '') + (S.lastFacts ? ' · Fakten bis ' + L.formatDay(S.lastFacts) : '') }),
+            nameField(),
             btn('Sicherung herunterladen', 'secondary', exportBackup),
             h('label', { class: 'field' }, h('span', { text: 'Sicherung einspielen' }), fileInput),
             btn('Passwort ändern', 'secondary', function () {
-              C.auth.sendPasswordResetEmail(u.email).then(function () { toast('Ein Link zum Ändern ist an ' + u.email + ' unterwegs.'); }, function (e) { toast(C.message(e)); });
+              withReturn(function (o) { return C.auth.sendPasswordResetEmail(u.email, o); }).then(function () { toast('Ein Link zum Ändern ist an ' + u.email + ' unterwegs.'); }, function (e) { toast(C.message(e)); });
             }),
             btn('Abmelden', 'secondary', signOut),
             btn('Konto löschen', 'link', openDeleteAccount),
@@ -2369,6 +2419,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       S.pick = null;
       S.seen.win = false; S.fresh.win = false;
       subWindow();
+      loadSide();
     }
     const sig = p.date + L.BLOCKS.map(function (b) { return L.blockUnlocked(b, times(), p.minutes, dayRec().unlocked) ? '1' : '0'; }).join('');
     if (sig !== S.sig) { S.sig = sig; scheduleRender(); }

@@ -1,7 +1,7 @@
 /* Lumen service worker.
    - Offline: pages, scripts and content are served from the network when possible and from the cache otherwise.
    - Reminders: Firebase Cloud Messaging shows the notifications sent by tools/send-reminders.mjs. */
-const CACHE = 'lumen-v1';
+const CACHE = 'lumen-v2';
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const SHELL = ['./', 'index.html', 'lumen-cloud.js', 'firebase-config.js', 'manifest.webmanifest', 'icon-180.png', 'icon.svg',
   SDK + 'firebase-app-compat.js', SDK + 'firebase-auth-compat.js', SDK + 'firebase-firestore-compat.js', SDK + 'firebase-messaging-compat.js'];
@@ -23,12 +23,18 @@ self.addEventListener('activate', function (event) {
   }).then(function () { return self.clients.claim(); }));
 });
 
+/* One cache entry per file: the query (?t=…, ?v=…) only bypasses the browser cache and must not pile up copies. */
+function keyOf(request) {
+  const u = new URL(request.url);
+  return u.origin === self.location.origin ? u.origin + u.pathname : request.url;
+}
 function networkFirst(request) {
+  const key = keyOf(request);
   return fetch(request).then(function (res) {
-    if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(request, copy); }); }
+    if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(key, copy); }); }
     return res;
   }).catch(function () {
-    return caches.match(request, { ignoreSearch: true }).then(function (hit) {
+    return caches.match(key).then(function (hit) {
       return hit || (request.mode === 'navigate' ? caches.match('index.html') : undefined) || Response.error();
     });
   });

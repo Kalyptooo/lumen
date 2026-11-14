@@ -99,6 +99,7 @@ button.sort.on { color: var(--text); text-decoration: underline; }
 .quiz li.right { font-weight: 650; color: var(--good); }
 .news ul { margin: 4px 0 10px; padding-left: 20px; }
 .person .kpis { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
+.stack { display: flex; flex-direction: column; gap: 10px; }
 </style>
 </head>
 <body>
@@ -195,6 +196,8 @@ button.sort.on { color: var(--text); text-decoration: underline; }
       render();
       return;
     }
+    // New error reports go on to the weekly task without a click.
+    try { await C.forwardReports(); } catch (e) { /* tried again on the next visit */ }
     try {
       const got = await Promise.all([
         C.db.doc('config/public').get(), C.db.collection('members').get(), C.db.collection('digest').get(),
@@ -578,36 +581,51 @@ button.sort.on { color: var(--text); text-decoration: underline; }
         h('ol', {}, (f.quizAlt.options || []).map(function (o, i) { return h('li', { class: i === f.quizAlt.correct ? 'right' : null, text: o + (i === f.quizAlt.correct ? '  ✓' : '') }); })),
         f.quizAlt.explanation ? h('p', { class: 'hint', text: f.quizAlt.explanation }) : null) : null,
       h('div', { class: 'row' },
-        btn('Bearbeiten', 'secondary small', function () { S.edit = { id: f.id, title: f.title, text: f.text, mnemonic: f.mnemonic || '', question: q.question || '', options: (q.options || ['', '', '', '']).slice(), correct: q.correct || 0, explanation: q.explanation || '' }; render(); }, S.busy),
+        btn('Bearbeiten', 'secondary small', function () { S.edit = { id: f.id, title: f.title, text: f.text, mnemonic: f.mnemonic || '', quiz: quizDraft(q), alt: f.quizAlt ? quizDraft(f.quizAlt) : null }; render(); }, S.busy),
         btn(f.retired ? 'Wieder einblenden' : 'Für alle ausblenden', 'secondary small', function () {
           if (!f.retired && !window.confirm('„' + f.title + '“ für alle ausblenden? Der Fakt verschwindet aus Heute, Archiv und Quiz.')) return;
           setOverride(f.id, f.retired ? { retired: false } : { retired: true }, f.retired ? 'Wieder eingeblendet.' : 'Ausgeblendet.');
         }, S.busy),
         ov ? btn('Meine Änderung verwerfen', 'secondary small', function () { setOverride(f.id, null, 'Original wiederhergestellt.'); }, S.busy) : null));
   }
+  function quizDraft(q) {
+    const opts = Array.isArray(q && q.options) ? q.options.slice(0, 4) : [];
+    while (opts.length < 4) opts.push('');
+    return { question: (q && q.question) || '', options: opts, correct: Number.isInteger(q && q.correct) ? q.correct : 0, explanation: (q && q.explanation) || '' };
+  }
   function editCard(f) {
     const E = S.edit;
     const field = function (label, key, tag, attrs) {
       return h('label', { class: 'field' }, h('span', { text: label }), h(tag || 'input', Object.assign({ value: E[key], oninput: function (e) { E[key] = e.target.value; } }, attrs || {})));
     };
+    const quizFields = function (Q, label, name) {
+      return h('div', { class: 'stack' },
+        h('label', { class: 'field' }, h('span', { text: label }), h('input', { type: 'text', value: Q.question, oninput: function (e) { Q.question = e.target.value; } })),
+        h('div', { class: 'field' }, h('span', { text: 'Antworten (richtige markieren)' }), Q.options.map(function (o, i) {
+          return h('div', { class: 'row' }, h('input', { type: 'radio', name: name, checked: Q.correct === i, 'aria-label': 'Antwort ' + (i + 1) + ' ist richtig', onchange: function () { Q.correct = i; } }),
+            h('input', { type: 'text', value: o, style: 'flex:1', 'aria-label': 'Antwort ' + (i + 1), oninput: function (e) { Q.options[i] = e.target.value; } }));
+        })),
+        h('label', { class: 'field' }, h('span', { text: 'Erklärung (ein Satz)' }), h('input', { type: 'text', value: Q.explanation, oninput: function (e) { Q.explanation = e.target.value; } })));
+    };
+    const clean = function (Q) {
+      const opts = Q.options.map(function (o) { return o.trim(); });
+      if (!Q.question.trim() || opts.some(function (o) { return !o; })) return null;
+      if (new Set(opts.map(function (o) { return o.toLowerCase(); })).size !== 4) return null;
+      return { question: Q.question.trim(), options: opts, correct: Q.correct, explanation: Q.explanation.trim() };
+    };
     return h('div', { class: 'card fact' }, h('h2', { text: 'Fakt bearbeiten' }),
       field('Titel (höchstens 60 Zeichen)', 'title', 'input', { type: 'text', maxlength: '60' }),
       field('Text', 'text', 'textarea', { rows: '5' }),
       field('Merksatz (optional)', 'mnemonic', 'input', { type: 'text' }),
-      field('Quizfrage', 'question', 'input', { type: 'text' }),
-      h('div', { class: 'field' }, h('span', { text: 'Antworten (richtige markieren)' }), E.options.map(function (o, i) {
-        return h('div', { class: 'row' }, h('input', { type: 'radio', name: 'correct', checked: E.correct === i, 'aria-label': 'Antwort ' + (i + 1) + ' ist richtig', onchange: function () { E.correct = i; } }),
-          h('input', { type: 'text', value: o, style: 'flex:1', 'aria-label': 'Antwort ' + (i + 1), oninput: function (e) { E.options[i] = e.target.value; } }));
-      })),
-      field('Erklärung (ein Satz)', 'explanation', 'input', { type: 'text' }),
+      quizFields(E.quiz, 'Quizfrage', 'correct'),
+      E.alt ? quizFields(E.alt, 'Zweitfrage', 'correctAlt') : null,
       h('div', { class: 'row' },
         btn('Für alle speichern', 'primary', function () {
-          const opts = E.options.map(function (o) { return o.trim(); });
-          if (!E.title.trim() || !E.text.trim() || !E.question.trim() || opts.some(function (o) { return !o; })) { toast('Titel, Text, Frage und alle vier Antworten ausfüllen.'); return; }
-          if (new Set(opts.map(function (o) { return o.toLowerCase(); })).size !== 4) { toast('Die vier Antworten müssen verschieden sein.'); return; }
-          const o = { title: E.title.trim().slice(0, 60), text: E.text.trim(), mnemonic: E.mnemonic.trim(),
-            quiz: { question: E.question.trim(), options: opts, correct: E.correct, explanation: E.explanation.trim() },
+          const quiz = clean(E.quiz), alt = E.alt ? clean(E.alt) : null;
+          if (!E.title.trim() || !E.text.trim() || !quiz || (E.alt && !alt)) { toast('Titel, Text und jede Frage mit vier verschiedenen Antworten ausfüllen.'); return; }
+          const o = { title: E.title.trim().slice(0, 60), text: E.text.trim(), mnemonic: E.mnemonic.trim(), quiz: quiz,
             correction: { at: nowISO(), summary: 'Vom Admin überarbeitet.' }, adminEdited: true, retired: false };
+          if (alt) o.quizAlt = alt;
           setOverride(f.id, o, 'Gespeichert. Gilt sofort für alle.');
         }, S.busy),
         btn('Abbrechen', 'secondary', function () { S.edit = null; render(); })));
@@ -634,7 +652,7 @@ button.sort.on { color: var(--text); text-decoration: underline; }
     const list = allReports(), open = list.filter(function (r) { return !handled(r); });
     const toSend = open.filter(function (r) { return !forwarded(r); });
     return [h('div', { class: 'card' }, h('h2', { text: 'Fehlermeldungen' }),
-      h('p', { class: 'hint', text: 'Du kannst einen Fakt sofort selbst korrigieren oder ausblenden (über „Fakt öffnen“) oder die Meldung an die Wochenaufgabe weitergeben. Die prüft am Sonntag mit Quellen. Sie bekommt nur Fakt und Hinweis, keine Namen.' }),
+      h('p', { class: 'hint', text: 'Neue Meldungen gehen automatisch an die Wochenaufgabe, sobald du Lumen oder diese Seite öffnest. Sie prüft am Sonntag mit Quellen und bekommt nur Fakt und Hinweis, keine Namen. Einen Fakt kannst du auch sofort selbst korrigieren oder ausblenden (über „Fakt öffnen“).' }),
       h('div', { class: 'row' }, btn(toSend.length ? toSend.length + ' offene Meldung' + (toSend.length === 1 ? '' : 'en') + ' weitergeben' : 'Alles weitergegeben', 'primary', function () {
         const keep = (S.pub.reports || []).filter(function (x) { return !handled(x); });
         const next = keep.concat(toSend.map(function (r) { return { factId: r.factId, note: String(r.note || '').slice(0, 200), reportedAt: r.reportedAt }; })).slice(-60);
