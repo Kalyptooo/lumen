@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-22T10:11:37.325Z",
+ "updatedAt": "2026-11-22T10:12:49.275Z",
  "days": [
   "2026-11-11",
   "2026-11-12",
@@ -44,7 +44,8 @@
  ],
  "news": [
   "2026-11-12",
-  "2026-11-15"
+  "2026-11-15",
+  "2026-11-22"
  ],
  "idx": [
   "2026-11-11-0033",
@@ -67,7 +68,7 @@
   "at": "2026-11-22T10:08:23.733Z",
   "added": 35,
   "lastDate": "2026-12-20",
-  "newsDate": null,
-  "notes": "Webzugriff frei. Admin-Vorgaben nicht lesbar (404), Standardgewichte. Keine offenen Fehlermeldungen. 35 Fakten für 14.–20.12. ergänzt."
+  "newsDate": "2026-11-22",
+  "notes": "Webzugriff frei. Admin-Vorgaben nicht lesbar (404), Standardgewichte. Keine offenen Fehlermeldungen. 35 Fakten für 14.–20.12. ergänzt, Aktuell mit 4 Meldungen (ORF.at, geöffnet). Keine Primärquelle für Recht gefunden, Bezirksgerichte via ORF."
  }
 }
