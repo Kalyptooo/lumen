@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-15T10:10:43.862Z",
+ "updatedAt": "2026-11-22T10:11:37.325Z",
  "days": [
   "2026-11-11",
   "2026-11-12",
@@ -33,7 +33,14 @@
   "2026-12-10",
   "2026-12-11",
   "2026-12-12",
-  "2026-12-13"
+  "2026-12-13",
+  "2026-12-14",
+  "2026-12-15",
+  "2026-12-16",
+  "2026-12-17",
+  "2026-12-18",
+  "2026-12-19",
+  "2026-12-20"
  ],
  "news": [
   "2026-11-12",
@@ -43,22 +50,24 @@
   "2026-11-11-0033",
   "2026-11-11-0531",
   "2026-11-12-1800",
-  "2026-11-15-1108"
+  "2026-11-15-1108",
+  "2026-11-22-1108"
  ],
  "runs": [
   "2026-11-11-0033",
   "2026-11-11-0531",
   "2026-11-12-1800",
-  "2026-11-15-1108"
+  "2026-11-15-1108",
+  "2026-11-22-1108"
  ],
- "lastDate": "2026-12-13",
+ "lastDate": "2026-12-20",
  "reportsHandledUntil": null,
  "lastRun": {
-  "batch": "2026-11-15-1108",
-  "at": "2026-11-15T10:08:00.503Z",
-  "added": 15,
-  "lastDate": "2026-12-13",
-  "newsDate": "2026-11-15",
-  "notes": "15 Fakten für 11. bis 13. Dezember ergänzt (Vorrat bis 2026-12-13), Aktuell mit 3 Meldungen angelegt. Vorgaben des Admins nicht lesbar (Dokument config/public nicht gefunden), Standardgewichte verwendet; keine offenen Fehlermeldungen. ots.at war gesperrt, Meldung zu Apotheken-Impfen (4.11.) bewusst weggelassen."
+  "batch": "2026-11-22-1108",
+  "at": "2026-11-22T10:08:23.733Z",
+  "added": 35,
+  "lastDate": "2026-12-20",
+  "newsDate": null,
+  "notes": "Webzugriff frei. Admin-Vorgaben nicht lesbar (404), Standardgewichte. Keine offenen Fehlermeldungen. 35 Fakten für 14.–20.12. ergänzt."
  }
 }
