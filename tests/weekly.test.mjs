@@ -187,6 +187,20 @@ test('Füllregel: bis 28 Tage voraus, höchstens 21 Tage pro Lauf, lückenlos', 
   st = W.makeStatus(dbWith({ facts: W.dateRange('2026-10-01', '2026-10-20').map(day) }), { now });
   eq(st.fill[0], '2026-11-15', 'nach einer Lücke beginnt der neue Vorrat heute');
 });
+test('Mehr als 5 Fakten pro Tag: die Wochenladung ergänzt entsprechend mehr Vorratstage', () => {
+  const now = new Date('2026-11-15T10:07:00Z');
+  const day = (d) => ({ id: d, data: { date: d, items: Object.fromEntries([1, 2, 3, 4, 5].map((s) => [s, { id: `${d}-${s}`, slot: s, area: ['geld', 'tech', 'recht', 'erklaert', 'natur'][s - 1], title: `T ${d} ${s}` }])) } });
+  const facts = W.dateRange('2026-11-11', '2026-12-13').map(day);
+  const digest = (counts) => ({ id: 'u_admin', data: { defaultCounts: counts } });
+  eq(W.makeStatus(dbWith({ facts, digests: [digest({ morgen: 1, mittag: 1, abend: 3 })] }), { now }).fill, []);
+  eq(W.makeStatus(dbWith({ facts, digests: [digest({ morgen: 1, mittag: 1, abend: 1 })] }), { now }).fill, [], 'weniger braucht nicht mehr Vorrat');
+  const st = W.makeStatus(dbWith({ facts, digests: [digest({ morgen: 3, mittag: 2, abend: 3 })] }), { now });
+  eq(st.perDay, 8);
+  eq(st.fill.length, 12);
+  eq(st.fill[0], '2026-12-14');
+  eq(W.plannedPerDay(undefined), 5);
+  eq(W.plannedPerDay({ morgen: 0, mittag: 0, abend: 0 }), 5);
+});
 test('Geänderte Einstellungen: ersetzt wird ab heute plus 3 Tage, höchstens 14 Tage, Auffüllen hat Vorrang', () => {
   const now = new Date('2026-11-15T10:07:00Z');
   const day = (d) => ({ id: d, data: { date: d, items: Object.fromEntries([1, 2, 3, 4, 5].map((s) => [s, { id: `${d}-${s}`, slot: s, area: ['geld', 'tech', 'recht', 'erklaert', 'natur'][s - 1], title: `T ${d} ${s}` }])) } });

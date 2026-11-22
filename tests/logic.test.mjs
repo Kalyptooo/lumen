@@ -271,9 +271,9 @@ test('Fakten ohne gültiges Quiz werden nicht abgefragt', () => {
   eq(L.quizzable(fact('2026-11-10', 1, { retired: true })), false);
   eq(L.quizzable(null), false);
 });
-test('Nachholen: ungelesene Fakten der letzten sieben Tage, nicht heute, nichts Älteres', () => {
+test('Nachholen: ungelesene Fakten der letzten zwei Wochen, nicht heute, nichts Älteres', () => {
   const today = '2026-11-20';
-  const facts = [fact('2026-11-12', 1), fact('2026-11-13', 2), fact('2026-11-19', 1), fact('2026-11-19', 3),
+  const facts = [fact('2026-11-05', 1), fact('2026-11-13', 2), fact('2026-11-19', 1), fact('2026-11-19', 3),
     fact('2026-11-19', 2, { retired: true }), fact(today, 1), fact('2026-11-18', 4)];
   const states = { '2026-11-19-3': { seenAt: 'x' }, '2026-11-18-4': { known: true } };
   eq(L.selectCatchup(facts, states, today).map((f) => f.id), ['2026-11-13-2', '2026-11-19-1']);
@@ -580,6 +580,45 @@ test('Schwer für mich: oft falsch oder zuletzt falsch', () => {
   eq(L.isHard({ correct: 5, wrong: 1, box: 2, lastReviewed: 'x' }), false);
   eq(L.isHard({ correct: 5, wrong: 1, box: 0, lastReviewed: 'x' }), true);
   eq(L.isHard({ correct: 0, wrong: 2, known: true }), false);
+});
+
+/* ---------- personal day plan ---------- */
+
+test('Tagesplan: eigene Einstellung schlägt die Admin-Vorgabe, nur wenn gesetzt', () => {
+  eq(L.dayConfig({}, {}).counts, { morgen: 1, mittag: 1, abend: 3 });
+  eq(L.dayConfig({}, {}).catchup, 2);
+  const admin = { defaultCounts: { morgen: 2, mittag: 0, abend: 1 }, defaultCatchup: 1, defaultTimes: { morgen: '08:00' } };
+  let c = L.dayConfig(admin, {});
+  eq([c.total, c.catchup, c.times.morgen, c.times.abend, c.custom], [3, 1, '08:00', '18:00', false]);
+  c = L.dayConfig(admin, { counts: { morgen: 0, mittag: 4, abend: 0 }, catchup: 0, times: { morgen: '06:30' } });
+  eq([c.total, c.counts.mittag, c.catchup, c.times.morgen, c.custom], [4, 4, 0, '06:30', true]);
+  c = L.dayConfig(admin, { counts: null, catchup: null, times: null });
+  eq([c.total, c.catchup, c.times.morgen, c.custom], [3, 1, '08:00', false], 'zurück zur Vorgabe');
+  eq(L.normalizeCounts({ morgen: 8, mittag: 8, abend: 8 }), { morgen: 8, mittag: 2, abend: 0 }, 'höchstens zehn');
+  eq(L.normalizeCounts({ morgen: 0, mittag: 0, abend: 0 }), { morgen: 1, mittag: 1, abend: 3 });
+});
+const poolOf = (from, days) => { const out = []; for (let i = 0; i < days; i += 1) for (let s = 1; s <= 5; s += 1) out.push(fact(L.addDays(from, i), s)); return out; };
+test('Tagesauswahl: weniger, mehr und stabil über den Tag', () => {
+  const today = '2026-11-22', pool = poolOf(today, 3), ids = (l) => l.map((f) => f.id);
+  eq(ids(L.pickDayFacts(pool, {}, today, 3)), ['2026-11-22-1', '2026-11-22-2', '2026-11-22-3']);
+  eq(ids(L.pickDayFacts(pool, {}, today, 7)).slice(-2), ['2026-11-23-1', '2026-11-23-2'], 'mehr als ein Tag hat: weiter im Vorrat');
+  const read = { '2026-11-22-1': { seenAt: '2026-11-22T08:00:00Z', box: 0 }, '2026-11-22-2': { seenAt: '2026-11-22T09:00:00Z', known: true } };
+  eq(ids(L.pickDayFacts(pool, read, today, 3)), ['2026-11-22-1', '2026-11-22-2', '2026-11-22-3'], 'Gelesenes bleibt im Tagesplan, es kommt nichts dazu');
+  const ahead = { '2026-11-23-1': { seenAt: '2026-11-22T20:00:00Z' }, '2026-11-23-2': { seenAt: '2026-11-22T20:00:00Z' } };
+  eq(ids(L.pickDayFacts(pool, ahead, '2026-11-23', 2)), ['2026-11-23-3', '2026-11-23-4'], 'schon Gelesenes kommt nicht noch einmal');
+  eq(L.pickDayFacts(pool, {}, '2026-12-30', 5), [], 'Vorrat zu Ende');
+  const stages = L.assignBlocks(L.pickDayFacts(pool, {}, today, 5), { morgen: 2, mittag: 0, abend: 3 });
+  eq(stages.map((f) => f.block), ['morgen', 'morgen', 'abend', 'abend', 'abend']);
+  const m = L.todayModel({ today, minutes: 600, planned: stages, states: {}, days: {}, times: undefined });
+  eq(m.blocks.map((b) => b.total), [2, 0, 3]);
+});
+test('Nach zehn Tagen Pause kommen nur ein paar zum Nachholen, nichts über die eigene Tageszahl', () => {
+  const today = '2026-11-22', pool = poolOf('2026-11-01', 22), start = '2026-11-01';
+  eq(L.selectCatchup(pool, {}, today, start, { limit: 2, maxSlot: 5 }).map((f) => f.id), ['2026-11-08-1', '2026-11-08-2']);
+  eq(L.selectCatchup(pool, {}, today, start, { limit: 0, maxSlot: 5 }), []);
+  const three = L.selectCatchup(pool, {}, today, start, { maxSlot: 3 });
+  eq(three.some((f) => f.slot > 3), false);
+  eq(L.selectCatchup(pool, {}, today, today, { limit: 2, maxSlot: 5 }), [], 'wer heute anfängt, holt nichts nach');
 });
 
 /* ---------- result ---------- */
