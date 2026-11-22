@@ -72,6 +72,7 @@ for (const doc of list.documents || []) {
   const times = Object.assign({}, DEFAULT_TIMES, p.times || {});
   const sent = p.sent && p.sent.date === now.date ? (p.sent.blocks || []) : [];
   const due = ['morgen', 'mittag', 'abend'].filter((b) => {
+    if (p.counts && Number(p.counts[b]) === 0) return false; // this person has no facts at this stage
     const t = minutesOf(times[b]);
     return t !== null && now.minutes >= t && now.minutes < t + LATE && !sent.includes(b);
   });

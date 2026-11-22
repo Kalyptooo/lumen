@@ -351,6 +351,13 @@ export function loadDb(dbDir, adminFile) {
 
 /* ---------- Lage und Plan ---------- */
 
+// The admin's number of facts per day. A store day always holds five facts; more per day means more store days per week.
+export function plannedPerDay(counts) {
+  if (!counts || typeof counts !== 'object') return 5;
+  const n = ['morgen', 'mittag', 'abend'].reduce((s, b) => s + (Number.isInteger(counts[b]) && counts[b] > 0 ? counts[b] : 0), 0);
+  return n >= 1 ? Math.min(n, 10) : 5;
+}
+
 export function makeStatus(db, opts = {}) {
   const now = opts.now || new Date();
   const v = vienna(now);
@@ -372,7 +379,12 @@ export function makeStatus(db, opts = {}) {
   const reportsHandledUntil = carry('reportsHandledUntil');
   const settingsChangedAt = main.settingsChangedAt || null;
 
-  const target = opts.fillTo || addDays(today, FILL_AHEAD);
+  const perDay = plannedPerDay(main.defaultCounts);
+  let target = opts.fillTo || addDays(today, FILL_AHEAD);
+  if (!opts.fillTo && perDay > 5 && lastDate) {
+    const grown = addDays(lastDate, Math.ceil(perDay * 7 / 5));
+    if (grown > target) target = grown;
+  }
   let start = lastDate && lastDate >= today ? addDays(lastDate, 1) : today;
   if (lastDate && lastDate < today && dayAreas[today]) start = addDays(today, 1);
   let fill = start <= target ? dateRange(start, target) : [];
@@ -402,7 +414,7 @@ export function makeStatus(db, opts = {}) {
     .sort((a, b) => (String(a.askedAt) < String(b.askedAt) ? -1 : 1)).slice(0, 5);
 
   return {
-    today, batch, lastDate, incomplete, target, fill, replace, cells, weights, wish: String(main.wish || ''),
+    today, batch, lastDate, incomplete, target, perDay, fill, replace, cells, weights, wish: String(main.wish || ''),
     settingsChangedAt, appliedSettingsAt, needReplace, reportsHandledUntil, lastRun,
     openReports, openResearch, known: Array.isArray(main.knownIds) ? main.knownIds : [],
     accuracy: main.areaAccuracy || {}, newsToday: db.news.some((n) => n.id === today),
@@ -414,7 +426,7 @@ function printStatus(st, db) {
   const out = [];
   const say = (s = '') => out.push(s);
   say(`HEUTE: ${st.today} (${WEEKDAYS[weekday(st.today)]}) · BATCH: ${st.batch}`);
-  say(`VORRAT: letzter Tag ${st.lastDate || 'keiner'} · Ziel ${st.target}`);
+  say(`VORRAT: letzter Tag ${st.lastDate || 'keiner'} · Ziel ${st.target}${st.perDay > 5 ? ` · Admin-Vorgabe ${st.perDay} Fakten pro Tag, darum mehr Vorratstage (jeder Vorratstag hat weiter genau 5 Fakten)` : ''}`);
   if (st.incomplete.length) say(`ACHTUNG, unvollständige Tage (nicht 5 Fakten): ${st.incomplete.join(', ')}`);
   say(st.fill.length ? `AUFFÜLLEN: ${st.fill.length} Tage (${st.fill[0]} bis ${st.fill[st.fill.length - 1]}) = ${st.fill.length * 5} Fakten` : 'AUFFÜLLEN: kein Bedarf');
   if (st.needReplace) {
