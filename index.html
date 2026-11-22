@@ -272,6 +272,19 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .times { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .times .field { min-width: 0; }
 .field input[type="time"] { min-width: 0; -webkit-appearance: none; appearance: none; text-align: left; padding-inline: 10px; }
+.planhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.planrow { display: grid; grid-template-columns: minmax(0, 1fr) 106px 112px; align-items: center; gap: 8px; min-height: 48px; }
+.planrow input[type="time"] {
+  width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  font-size: max(1rem, 16px); -webkit-appearance: none; appearance: none; text-align: left;
+}
+.planrow.off input[type="time"], .planrow.off label { opacity: .45; }
+.planrow .wide { grid-column: 1 / 3; }
+.stepper { display: grid; grid-template-columns: 38px 1fr 38px; align-items: center; background: var(--surface-2); border-radius: 12px; }
+.stepper button { height: 44px; padding: 0; border: 0; background: transparent; font-size: 1.25rem; }
+.stepper button[disabled] { opacity: .3; cursor: default; }
+.stepper output { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
+@media (max-width: 350px) { .planrow { grid-template-columns: minmax(0, 1fr) 92px 100px; gap: 6px; } .planrow input[type="time"] { padding-inline: 6px; } .stepper { grid-template-columns: 32px 1fr 32px; } }
 .switchrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
 .switchrow input[type="checkbox"] {
   -webkit-appearance: none; appearance: none; flex: none; margin: 0; width: 51px; height: 31px; border-radius: 16px; cursor: pointer;
@@ -421,7 +434,9 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   const DEFAULT_TIMES = { morgen: '07:00', mittag: '12:00', abend: '18:00' };
   const QUIZ_LIMIT = 10;
   const DAILY_LIMIT = 15;
-  const CATCHUP_DAYS = 7;
+  const CATCHUP_DAYS = 14;
+  const DEFAULT_COUNTS = { morgen: 1, mittag: 1, abend: 3 };
+  const DEFAULT_CATCHUP = 2, MAX_CATCHUP = 5, MAX_PER_DAY = 10;
   const RECENT_LIMIT = 30;
   const AREAS = [
     { key: 'geld', name: 'Geld & Finanzen', short: 'Geld', type: 'alltag' },
@@ -629,13 +644,64 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     if (rec.quizDone) return 0;
     return Math.max(0, DAILY_LIMIT - (rec.quizCount || 0));
   }
-  /* Unread facts of the last seven days (not today), never from before the person started. */
-  function selectCatchup(facts, states, today, startDate) {
+  /* Missed facts of the last two weeks (not today), never from before the person started, oldest first.
+     opts.limit: only this many now, so a long break never turns into a pile. opts.maxSlot: facts beyond the personal daily number never count as missed. */
+  function selectCatchup(facts, states, today, startDate, opts) {
+    const o = opts || {};
     let from = addDays(today, -CATCHUP_DAYS);
     if (isDateStr(startDate) && startDate > from) from = startDate;
-    return (facts || []).filter(function (f) {
-      return f && !f.retired && f.date >= from && f.date < today && !isHandled((states || {})[f.id]);
+    const list = (facts || []).filter(function (f) {
+      return f && !f.retired && f.date >= from && f.date < today && !isHandled((states || {})[f.id]) &&
+        (!o.maxSlot || (f.slot || 0) <= o.maxSlot);
     }).sort(byDateSlot);
+    return typeof o.limit === 'number' ? list.slice(0, Math.max(0, o.limit)) : list;
+  }
+
+  /* ---------- personal day plan ---------- */
+
+  function normalizeCounts(counts) {
+    const out = {};
+    let left = MAX_PER_DAY;
+    BLOCKS.forEach(function (b) {
+      const n = counts ? Math.floor(Number(counts[b])) : 0;
+      const v = Number.isFinite(n) && n > 0 ? Math.min(n, left) : 0;
+      out[b] = v;
+      left -= v;
+    });
+    return left === MAX_PER_DAY ? Object.assign({}, DEFAULT_COUNTS) : out;
+  }
+  /* The admin sets the default for everyone; what a person sets for themselves replaces it, for that person only. */
+  function dayConfig(admin, personal) {
+    const a = admin || {}, p = personal || {};
+    const counts = normalizeCounts(p.counts && typeof p.counts === 'object' ? p.counts : (a.defaultCounts || DEFAULT_COUNTS));
+    const c = Number.isInteger(p.catchup) ? p.catchup : (Number.isInteger(a.defaultCatchup) ? a.defaultCatchup : DEFAULT_CATCHUP);
+    return {
+      times: Object.assign({}, DEFAULT_TIMES, a.defaultTimes || {}, p.times || {}),
+      counts: counts,
+      total: BLOCKS.reduce(function (n, b) { return n + counts[b]; }, 0),
+      catchup: Math.max(0, Math.min(MAX_CATCHUP, c)),
+      custom: !!(p.times || p.counts) || Number.isInteger(p.catchup)
+    };
+  }
+  /* Today's facts for one person: what they already read today plus the next unread ones, up to their number. */
+  function pickDayFacts(pool, states, today, total) {
+    const s = states || {};
+    const live = (pool || []).filter(function (f) { return f && !f.retired && f.date >= today; }).sort(byDateSlot);
+    const done = live.filter(function (f) { return isHandled(s[f.id]) && dateOfISO(s[f.id].seenAt) === today; });
+    const open = live.filter(function (f) { return !isHandled(s[f.id]); });
+    return done.concat(open.slice(0, Math.max(0, total - done.length))).sort(byDateSlot);
+  }
+  /* Spreads the day's facts over the stages; anything beyond the plan goes to the last stage in use. */
+  function assignBlocks(facts, counts) {
+    const c = normalizeCounts(counts), used = BLOCKS.filter(function (b) { return c[b] > 0; }), last = used[used.length - 1];
+    const out = [];
+    let i = 0;
+    used.forEach(function (b) {
+      const n = b === last ? facts.length - i : c[b];
+      facts.slice(i, i + n).forEach(function (f) { out.push(Object.assign({}, f, { block: b })); });
+      i += n;
+    });
+    return out;
   }
 
   /* ---------- random practice ---------- */
@@ -672,7 +738,9 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   function todayModel(input) {
     const states = input.states || {};
     const rec = (input.days || {})[input.today] || {};
-    const dayFacts = (input.dayFacts || []).filter(function (f) { return f && f.date === input.today && !f.retired; });
+    const dayFacts = Array.isArray(input.planned)
+      ? input.planned.filter(function (f) { return f && !f.retired; })
+      : (input.dayFacts || []).filter(function (f) { return f && f.date === input.today && !f.retired; });
     const blocks = BLOCKS.map(function (block) {
       const facts = dayFacts.filter(function (f) { return f.block === block; }).sort(bySlot);
       const open = facts.filter(function (f) { return !isHandled(states[f.id]); });
@@ -712,7 +780,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   /* ---------- streak and counters ---------- */
 
   function dayCounts(rec) {
-    return !!(rec && ((Array.isArray(rec.blocksDone) && rec.blocksDone.length > 0) || rec.quizDone || rec.practiced));
+    return !!(rec && ((Array.isArray(rec.blocksDone) && rec.blocksDone.length > 0) || rec.quizDone || rec.practiced || rec.catchupRead));
   }
   function streak(days, today) {
     const d = days || {};
@@ -912,7 +980,8 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
 
   const api = {
     TZ: TZ, INTERVALS: INTERVALS, BLOCKS: BLOCKS, BLOCK_NAMES: BLOCK_NAMES, DEFAULT_TIMES: DEFAULT_TIMES,
-    QUIZ_LIMIT: QUIZ_LIMIT, DAILY_LIMIT: DAILY_LIMIT, CATCHUP_DAYS: CATCHUP_DAYS, AREAS: AREAS, AREA_BY_KEY: AREA_BY_KEY, NEWS_AREAS: NEWS_AREAS,
+    QUIZ_LIMIT: QUIZ_LIMIT, DAILY_LIMIT: DAILY_LIMIT, CATCHUP_DAYS: CATCHUP_DAYS, DEFAULT_COUNTS: DEFAULT_COUNTS, DEFAULT_CATCHUP: DEFAULT_CATCHUP, MAX_CATCHUP: MAX_CATCHUP, MAX_PER_DAY: MAX_PER_DAY,
+    normalizeCounts: normalizeCounts, dayConfig: dayConfig, pickDayFacts: pickDayFacts, assignBlocks: assignBlocks, AREAS: AREAS, AREA_BY_KEY: AREA_BY_KEY, NEWS_AREAS: NEWS_AREAS,
     viennaParts: viennaParts, isDateStr: isDateStr, addDays: addDays, diffDays: diffDays, todayStr: todayStr,
     yesterdayStr: yesterdayStr, weekdayOf: weekdayOf, dateOfISO: dateOfISO, parseTime: parseTime, formatDay: formatDay,
     factDate: factDate, monthDocId: monthDocId, bySlot: bySlot, byDateSlot: byDateSlot, factsOfDayDoc: factsOfDayDoc,
@@ -983,7 +1052,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     win: {}, winDay: null, cache: {},
     news: [], newsAt: 0, digest: null, digestLoaded: false, lists: { reports: [], research: [] }, answers: {}, handledUntil: null,
     flow: null, pflow: null, later: {}, pick: null, busy: false, randomSeen: {},
-    archive: { query: '', filter: 'all', days: {}, oldest: null, end: false, loading: false, started: false, idx: null, hits: [], cap: 120 },
+    archive: { query: '', filter: 'all', days: {}, loading: false, failed: false, idx: null, hits: [], cap: 120 },
     askOff: false, sheets: [], lastFacts: undefined
   };
 
@@ -1017,7 +1086,8 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   const parts = function () { return L.viennaParts(S.now); };
   const today = function () { return parts().date; };
   const settings = function () { return S.priv.settings || {}; };
-  const times = function () { return Object.assign({}, L.DEFAULT_TIMES, (S.pub && S.pub.defaultTimes) || {}, settings().times || {}); };
+  const planCfg = function () { return L.dayConfig(S.pub, settings()); };
+  const times = function () { return planCfg().times; };
   const dayRec = function (d) { return S.ls.days[d || today()] || {}; };
   const clone = function (o) { return JSON.parse(JSON.stringify(o)); };
   const isObj = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };
@@ -1229,6 +1299,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     C.content.range(L.addDays(t, -L.CATCHUP_DAYS), t).then(function (win) {
       if (S.winDay !== t) return;
       S.win = win;
+      S.aheadEnd = null;
       arrived('win', { metadata: { fromCache: false } });
     }, failed('win'));
   }
@@ -1371,7 +1442,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
         h('div', { class: 'authlinks' }, btn('Zurück zur Anmeldung', 'link', function () { setForm({ mode: 'login', error: '', info: '' }); })));
     }
     return h('div', { class: 'card' }, h('div', { class: 'welcome' }, h('img', { src: 'icon.svg', alt: '', width: '56', height: '56' }),
-        h('div', {}, h('h2', { class: 'title', text: 'Lumen' }), h('p', { class: 'lead', text: 'Fünf Fakten am Tag, ein kurzes Quiz und Auffrischung.' }))),
+        h('div', {}, h('h2', { class: 'title', text: 'Lumen' }), h('p', { class: 'lead', text: 'Jeden Tag ein paar Fakten, ein kurzes Quiz und Auffrischung.' }))),
       authField('E-Mail', 'email', 'email', 'username'),
       authField('Passwort', 'password', 'password', 'current-password'),
       msg, btn(F.busy ? 'Einen Moment …' : 'Anmelden', 'primary', function () { authAction('login'); }, F.busy),
@@ -1420,16 +1491,62 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     Object.keys(S.win).forEach(function (d) { out = out.concat(L.factsOfDayDoc(S.win[d])); });
     return out;
   }
+  function plannedFacts() {
+    const c = planCfg();
+    return L.assignBlocks(L.pickDayFacts(windowFacts(), S.ls.states, today(), c.total), c.counts);
+  }
   function todayModel() {
     const p = parts();
-    return L.todayModel({ today: p.date, minutes: p.minutes, dayFacts: L.factsOfDayDoc(S.win[p.date]), states: S.ls.states, days: S.ls.days, times: times() });
+    return L.todayModel({ today: p.date, minutes: p.minutes, planned: plannedFacts(), states: S.ls.states, days: S.ls.days, times: times() });
+  }
+  /* Whoever reads more per day than a calendar day holds continues with the next days of the store. */
+  let aheadBusy = false;
+  async function ensureAhead() {
+    const t = today();
+    if (aheadBusy || S.aheadEnd === t) return;
+    aheadBusy = true;
+    let got = false;
+    try {
+      const m = await C.content.manifest();
+      const days = (m.days || []).filter(function (d) { return d > t && S.win[d] === undefined; }).sort();
+      for (let i = 0; i < days.length && plannedFacts().length < planCfg().total; i += 1) {
+        const doc = await C.content.day(days[i]);
+        if (S.winDay !== t) break;
+        S.win[days[i]] = doc;
+        got = true;
+      }
+      if (plannedFacts().length < planCfg().total) S.aheadEnd = t;
+    } catch (e) { S.aheadEnd = t; }
+    aheadBusy = false;
+    if (got) scheduleRender();
+  }
+  /* A fact read ahead can still be rewritten by the weekly task. Then the person has not read the new one. */
+  function forgetReplaced() {
+    if (!S.fresh.priv) return;
+    Object.keys(S.ls.states).forEach(function (id) {
+      const st = S.ls.states[id];
+      if (!st || !st.aheadBatch) return;
+      const f = factById(id);
+      if (f && f.batch && f.batch !== st.aheadBatch) saveState(id, null);
+    });
+  }
+  function catchupFacts() {
+    if (!settings().startDate) return [];
+    const c = planCfg();
+    return L.selectCatchup(windowFacts(), S.ls.states, today(), settings().startDate, { limit: Math.max(0, c.catchup - (dayRec().catchupRead || 0)), maxSlot: c.total });
   }
   function pending() {
-    const t = today();
     return {
-      quiz: L.selectDaily(S.ls.states, t, L.quizBudget(dayRec())).length,
-      catchup: L.selectCatchup(windowFacts(), S.ls.states, t, settings().startDate).length
+      quiz: L.selectDaily(S.ls.states, today(), L.quizBudget(dayRec())).length,
+      catchup: catchupFacts().length
     };
+  }
+  function planChanged() {
+    if (S.flow && S.flow.kind === 'stage') S.flow = null;
+    S.pick = null;
+    S.aheadEnd = null;
+    if (settings().push === true) savePushTimes();
+    scheduleRender();
   }
   const refreshIds = function () { return L.selectRefresh(S.ls.states, today(), !!dayRec().quizDone); };
 
@@ -1453,6 +1570,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       } else line = 'Alles, was du schon gelesen hast';
       if (S.stale) line += ' · offline';
     }
+    if (S.phase === 'ready') forgetReplaced();
     $('viewTitle').textContent = titles[S.tab] || 'Lumen';
     $('statusLine').textContent = line;
     const outside = S.phase === 'signin' || S.phase === 'verify' || S.phase === 'denied';
@@ -1525,6 +1643,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
     }
     const model = todayModel();
     syncBlocksDone(model);
+    if (model.blocks.reduce(function (n, b) { return n + b.total; }, 0) < planCfg().total) ensureAhead();
     if (S.flow && S.flow.type === 'quiz') { append(root, quizCard(S.flow, 'flow')); return; }
     if (S.flow && S.flow.type === 'read' && !factById(S.flow.ids[S.flow.index])) S.flow = null;
     append(root, dayBar(model));
@@ -1598,7 +1717,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       btn('Zufällig üben', 'primary', function () { S.tab = 'practice'; startQuiz('random', 'pflow'); }, S.busy || !L.learnedCount(S.ls.states)));
   }
   function startCatchup() {
-    const ids = L.selectCatchup(windowFacts(), S.ls.states, today(), settings().startDate).map(function (f) { return f.id; });
+    const ids = catchupFacts().map(function (f) { return f.id; });
     if (!ids.length) return;
     S.flow = { type: 'read', kind: 'catchup', ids: ids, index: 0 };
     render();
@@ -1619,8 +1738,11 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   }
   function readNext(flow, f, known) {
     const t = today(), prev = S.ls.states[f.id];
-    saveState(f.id, known ? L.afterKnown(prev, nowISO(), f.area) : L.afterRead(prev, nowISO(), t, f.area));
+    let next = known ? L.afterKnown(prev, nowISO(), f.area) : L.afterRead(prev, nowISO(), t, f.area);
+    if (f.date > t && f.batch) next = Object.assign({}, next, { aheadBatch: f.batch });
+    saveState(f.id, next);
     if (!known) bumpRead(f.area);
+    if (flow.kind === 'catchup') saveDay(t, { catchupRead: (dayRec().catchupRead || 0) + 1, ts: nowISO() });
     flow.index += 1;
     if (flow.index >= flow.ids.length) {
       S.flow = null;
@@ -1786,93 +1908,86 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
 
   /* ---------- Archiv ---------- */
 
-  async function loadArchive() {
+  /* The archive holds only what this person has read, last read first. */
+  function archiveIds() {
+    const A = S.archive, states = S.ls.states;
+    return Object.keys(states).filter(function (id) {
+      const st = states[id];
+      if (!L.isHandled(st)) return false;
+      if (A.filter === 'starred') return !!st.starred;
+      if (A.filter === 'hard') return L.isHard(st);
+      if (A.filter !== 'all') return st.area === A.filter;
+      return true;
+    }).sort(function (a, b) {
+      const x = states[a].seenAt || '', y = states[b].seenAt || '';
+      return x === y ? (a < b ? 1 : -1) : (x < y ? 1 : -1);
+    });
+  }
+  async function loadArchive(ids) {
     const A = S.archive;
-    if (A.loading || A.end || !S.db) return;
+    if (A.loading) return;
+    const dates = uniq(ids.map(L.factDate)).filter(function (d) { return dayDoc(d) === undefined; });
+    if (!dates.length) return;
     A.loading = true;
     scheduleRender();
-    try {
-      const before = A.oldest ? L.addDays(A.oldest, -1) : today();
-      const docs = await C.content.before(before, 14);
-      docs.forEach(function (data) {
-        if (data && L.isDateStr(data.date)) { A.days[data.date] = data; if (!A.oldest || data.date < A.oldest) A.oldest = data.date; }
-      });
-      if (docs.length < 14) A.end = true;
-    } catch (e) { toast('Das Archiv ließ sich gerade nicht laden.'); }
+    await ensureDays(dates);
+    A.failed = dates.some(function (d) { return dayDoc(d) === undefined; });
     A.loading = false;
     scheduleRender();
   }
   async function searchTopics() {
     const A = S.archive, q = A.query;
     try {
-      if (!A.idx) {
-        A.idx = L.mergeIdx(await C.content.idx());
-      }
+      if (!A.idx) A.idx = L.mergeIdx(await C.content.idx());
       if (q !== A.query) return;
-      A.hits = L.searchIdx(A.idx, q, today()).slice(0, 20);
+      A.hits = L.searchIdx(A.idx, q, '9999-12-31').filter(function (id) { return L.isHandled(S.ls.states[id]); }).slice(0, 40);
       await ensureDays(A.hits.map(L.factDate));
       scheduleRender();
     } catch (e) { /* the text search over loaded facts still works */ }
   }
-  async function loadStarred() {
-    const ids = Object.keys(S.ls.states).filter(function (id) { return S.ls.states[id].starred || L.isHard(S.ls.states[id]); }).sort().reverse().slice(0, 80);
-    await ensureDays(ids.map(L.factDate));
-    scheduleRender();
-  }
   function renderArchive() {
     const A = S.archive, list = $('archiveList'), chips = $('archiveChips');
     if (S.phase !== 'ready') { chips.textContent = ''; list.textContent = ''; list.appendChild(stateCard()); return; }
-    if (!A.started) { A.started = true; loadArchive(); }
     const x = chips.scrollLeft;
     chips.textContent = '';
     const isArea = !!L.AREA_BY_KEY[A.filter];
     [['all', 'Alle'], ['starred', 'Gemerkt'], ['hard', 'Schwer']].forEach(function (c) {
       chips.appendChild(h('button', {
         type: 'button', 'aria-pressed': String(A.filter === c[0]),
-        onclick: function () { A.filter = c[0]; A.cap = 120; if (c[0] === 'starred' || c[0] === 'hard') loadStarred(); render(); }
+        onclick: function () { A.filter = c[0]; A.cap = 120; A.failed = false; render(); }
       }, c[1]));
     });
-    const sel = h('select', { class: 'areaselect' + (isArea ? ' on' : ''), 'aria-label': 'Bereich', onchange: function (e) { A.filter = e.target.value || 'all'; A.cap = 120; render(); } },
+    const sel = h('select', { class: 'areaselect' + (isArea ? ' on' : ''), 'aria-label': 'Bereich', onchange: function (e) { A.filter = e.target.value || 'all'; A.cap = 120; A.failed = false; render(); } },
       h('option', { value: '', text: 'Bereich' }), L.AREAS.map(function (a) { const o = h('option', { value: a.key, text: a.short }); if (A.filter === a.key) o.selected = true; return o; }));
     chips.appendChild(sel);
     chips.scrollLeft = x;
 
-    const p = parts(), rec = dayRec(), q = A.query.trim(), all = {}, hits = {};
-    Object.keys(S.cache).forEach(function (d) { if (S.cache[d]) all[d] = S.cache[d]; });
-    Object.keys(A.days).forEach(function (d) { all[d] = A.days[d]; });
-    Object.keys(S.win).forEach(function (d) { all[d] = S.win[d]; });
+    const q = A.query.trim(), ids = archiveIds(), hits = {};
     A.hits.forEach(function (id) { hits[id] = true; });
-    let facts = [];
-    Object.keys(all).forEach(function (d) {
-      L.factsOfDayDoc(all[d]).forEach(function (f) { if (L.isReleased(f, p.date, p.minutes, times(), rec)) facts.push(f); });
-    });
-    facts = facts.filter(function (f) {
-      const st = S.ls.states[f.id];
-      if (A.filter === 'starred' && !(st && st.starred)) return false;
-      if (A.filter === 'hard' && !L.isHard(st)) return false;
-      if (A.filter !== 'all' && A.filter !== 'starred' && A.filter !== 'hard' && f.area !== A.filter) return false;
-      return !q || L.matchesQuery(f, q) || (q.length >= 3 && hits[f.id]);
-    }).sort(function (a, b) { return a.date === b.date ? a.slot - b.slot : (a.date < b.date ? 1 : -1); });
+    const wanted = ids.slice(0, q ? 200 : A.cap);
+    if (!A.failed) loadArchive(wanted);
+    let facts = wanted.map(factById).filter(Boolean);
+    if (q) {
+      A.hits.forEach(function (id) { if (wanted.indexOf(id) === -1 && ids.indexOf(id) !== -1 && factById(id)) facts.push(factById(id)); });
+      facts = facts.filter(function (f) { return L.matchesQuery(f, q) || (q.length >= 3 && hits[f.id]); });
+    }
 
     list.textContent = '';
-    let lastDate = '';
+    let lastDay = '';
     facts.slice(0, A.cap).forEach(function (f) {
-      if (f.date !== lastDate) { lastDate = f.date; list.appendChild(h('p', { class: 'dayhead', text: L.formatDay(f.date, { long: true }) })); }
-      const st = S.ls.states[f.id], area = L.AREA_BY_KEY[f.area];
-      const meta = (area ? area.short : f.area) + (f.retired ? ' · zurückgezogen' : (L.isKnown(st) ? ' · bekannt' : (L.isSeen(st) ? ' · gelesen' : ' · neu')));
+      const st = S.ls.states[f.id], area = L.AREA_BY_KEY[f.area], day = L.dateOfISO(st && st.seenAt) || f.date;
+      if (day !== lastDay) { lastDay = day; list.appendChild(h('p', { class: 'dayhead', text: L.formatDay(day, { long: true }) })); }
+      const meta = (area ? area.short : f.area) + (f.retired ? ' · zurückgezogen' : (L.isKnown(st) ? ' · schon gekannt' : ''));
       list.appendChild(h('button', { class: 'item', type: 'button', onclick: function () { openDetail(f.id); } }, areaDot(f.area),
         h('div', {}, h('strong', { text: f.title }), h('small', { text: meta })),
         st && st.starred ? h('span', { html: svg('<path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.2-4.1 5.8-.8z"/>', 'mark') }) : null,
         h('span', { html: ICON.next })));
     });
-    if (!facts.length && !A.loading) list.appendChild(h('p', { class: 'empty', text: q || A.filter !== 'all' ? 'Nichts gefunden.' : 'Noch keine Fakten im Archiv.' }));
+    if (!facts.length && !A.loading && !A.failed) list.appendChild(h('p', { class: 'empty', text: q || A.filter !== 'all' ? 'Nichts gefunden.' : 'Hier sammelt sich alles, was du gelesen hast.' }));
     const foot = h('div', { class: 'stack', style: 'margin-top:18px' });
-    if (facts.length > A.cap) foot.appendChild(btn('Mehr anzeigen', 'secondary', function () { A.cap += 120; render(); }));
     if (A.loading) foot.appendChild(h('p', { class: 'hint', text: 'Lädt …' }));
-    else if (!A.end) {
-      foot.appendChild(btn('Ältere laden', 'secondary', loadArchive));
-      if ((q || A.filter !== 'all') && A.oldest) foot.appendChild(h('p', { class: 'hint', text: 'Durchsucht bis ' + L.formatDay(A.oldest, { year: true }) + '. Themen findet die Suche im ganzen Archiv.' }));
-    } else if (facts.length) foot.appendChild(h('p', { class: 'hint', text: 'Das ist der Anfang des Archivs.' }));
+    else if (A.failed) foot.appendChild(btn('Erneut laden', 'secondary', function () { A.failed = false; render(); }));
+    else if (!q && ids.length > A.cap) foot.appendChild(btn('Mehr anzeigen', 'secondary', function () { A.cap += 120; render(); }));
     list.appendChild(foot);
   }
 
@@ -1956,9 +2071,10 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       if (f.retired) notes.push('Zurückgezogen');
       else if (f.correction && f.correction.at) notes.push('Korrigiert am ' + L.formatDay(String(f.correction.at).slice(0, 10), { year: true }) + (f.correction.summary ? ': ' + f.correction.summary : ''));
       if (status === 'offen' || status === 'geprueft') notes.push(L.reportStatusText(status, f));
-      const state = L.isKnown(st) ? 'als bekannt markiert' : (L.isSeen(st) ? 'gelesen' : 'noch nicht gelesen');
+      const when = L.dateOfISO(st && st.seenAt);
+      const state = (L.isKnown(st) ? 'Als bekannt markiert' : (L.isSeen(st) ? 'Gelesen' : 'Noch nicht gelesen')) + (when ? ' am ' + L.formatDay(when, { long: true, year: true }) : '');
       return [h('article', { class: 'card' }, factBody(f, st, true),
-          h('p', { class: 'note', text: L.formatDay(f.date, { long: true, year: true }) + ' · ' + state }),
+          h('p', { class: 'note', text: state }),
           notes.map(function (n) { return h('p', { class: 'statusnote', text: n }); }),
           !f.retired && !L.isHandled(st) ? btn('Als gelesen markieren', 'primary', function () {
             saveState(f.id, L.afterRead(st, nowISO(), today(), f.area)); bumpRead(f.area); touchDigest();
@@ -2064,7 +2180,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   let pushBusy = false;
   function savePushTimes() {
     if (!S.uid) return;
-    S.db.doc('push/' + S.uid).set({ times: times(), updatedAt: nowISO() }, { merge: true }).catch(function () {});
+    S.db.doc('push/' + S.uid).set({ times: times(), counts: planCfg().counts, updatedAt: nowISO() }, { merge: true }).catch(function () {});
   }
   async function enablePush(redraw) {
     if (pushBusy) return;
@@ -2088,7 +2204,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
       if (perm !== 'granted') { toast('Ohne deine Erlaubnis kann Lumen nicht erinnern. Du kannst sie in den iPhone-Einstellungen bei Lumen erteilen.'); pushBusy = false; redraw(); return; }
       const reg = await navigator.serviceWorker.ready;
       const token = await C.messaging.getToken({ vapidKey: self.LUMEN_VAPID, serviceWorkerRegistration: reg });
-      await S.db.doc('push/' + S.uid).set({ token: token, enabled: true, times: times(), updatedAt: nowISO() }, { merge: true });
+      await S.db.doc('push/' + S.uid).set({ token: token, enabled: true, times: times(), counts: planCfg().counts, updatedAt: nowISO() }, { merge: true });
       writePriv('settings', { push: true });
       toast('Erinnerungen sind an.');
     } catch (e) {
@@ -2106,7 +2222,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   function pushRow(t) {
     const redraw = function () { S.sheets.forEach(function (sh) { sh.draw(); }); };
     const on = settings().push === true;
-    return h('div', { class: 'switchrow' }, h('span', {}, 'Erinnerungen', h('small', { class: 'hint', style: 'display:block', text: on ? t.morgen + ', ' + t.mittag + ', ' + t.abend + ' Uhr' : (standalone() ? 'zu den Etappen, wenn noch etwas offen ist' : 'nur vom Home-Bildschirm aus') })),
+    return h('div', { class: 'switchrow' }, h('span', {}, 'Erinnerungen', h('small', { class: 'hint', style: 'display:block', text: on ? L.BLOCKS.filter(function (b) { return planCfg().counts[b] > 0; }).map(function (b) { return t[b]; }).join(', ') + ' Uhr' : (standalone() ? 'zu den Etappen, wenn noch etwas offen ist' : 'nur vom Home-Bildschirm aus') })),
       h('input', { id: 'pushToggle', type: 'checkbox', role: 'switch', checked: on, disabled: pushBusy || (!on && !standalone()), onchange: function (e) { if (e.target.checked) enablePush(redraw); else disablePush(redraw); } }));
   }
   function pushSection(t) {
@@ -2234,7 +2350,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
   /* ---------- Fortschritt und Einstellungen ---------- */
 
   function openProgress() {
-    let seg = 'progress';
+    let seg = 'progress', accountOpen = false;
     const sheet = openSheet('Fortschritt und Einstellungen', function () {
       const tabs = h('div', { class: 'seg', role: 'group', 'aria-label': 'Bereich wählen' },
         [['progress', 'Fortschritt'], ['friends', 'Freunde'], ['settings', 'Einstellungen']].map(function (t) {
@@ -2277,6 +2393,49 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
           h('div', {}, h('p', { class: 'hint', text: 'Gelesene Fakten und Trefferquote deiner letzten 30 Antworten.' }), L.AREAS.map(function (a) { return areaRow(a, stats, max); }))));
     }
     function tile(n, label) { return h('div', { class: 'tile' }, h('b', { text: String(n) }), h('span', { text: label })); }
+    function stepper(label, value, onminus, onplus, minusOff, plusOff) {
+      return h('div', { class: 'stepper', role: 'group', 'aria-label': label },
+        h('button', { type: 'button', text: '−', 'aria-label': label + ': weniger', disabled: minusOff, onclick: onminus }),
+        h('output', { text: String(value) }),
+        h('button', { type: 'button', text: '+', 'aria-label': label + ': mehr', disabled: plusOff, onclick: onplus }));
+    }
+    /* How many facts at which time. Starts from the admin's default; a change applies to this person only. */
+    function planSection() {
+      const c = planCfg();
+      const setCount = function (b, d) {
+        const next = Object.assign({}, c.counts);
+        next[b] += d;
+        writePriv('settings', { counts: next });
+        planChanged();
+        sheet.draw();
+      };
+      return h('div', { class: 'section' },
+        h('div', { class: 'planhead' }, h('h3', { text: 'Tagesplan' }), h('span', { class: 'hint', text: c.total + (c.total === 1 ? ' Fakt' : ' Fakten') + ' am Tag' })),
+        L.BLOCKS.map(function (b) {
+          let dirty = false;
+          const input = h('input', { id: 'time_' + b, type: 'time', value: c.times[b], 'aria-label': L.BLOCK_NAMES[b] + ', Uhrzeit',
+            onchange: function () {
+              if (L.parseTime(input.value) === null) { input.value = c.times[b]; return; }
+              const patch = { times: {} };
+              patch.times[b] = input.value;
+              writePriv('settings', patch);
+              dirty = true;
+              planChanged();
+            },
+            onblur: function () { if (dirty) { dirty = false; sheet.draw(); } } });
+          return h('div', { class: 'planrow' + (c.counts[b] ? '' : ' off') }, h('label', { for: 'time_' + b, text: L.BLOCK_NAMES[b] }), input,
+            stepper(L.BLOCK_NAMES[b], c.counts[b], function () { setCount(b, -1); }, function () { setCount(b, 1); }, c.counts[b] === 0 || c.total <= 1, c.total >= L.MAX_PER_DAY));
+        }),
+        h('div', { class: 'planrow' }, h('span', { class: 'wide', text: 'Nachholen pro Tag' }),
+          stepper('Nachholen pro Tag', c.catchup, function () { writePriv('settings', { catchup: c.catchup - 1 }); planChanged(); sheet.draw(); },
+            function () { writePriv('settings', { catchup: c.catchup + 1 }); planChanged(); sheet.draw(); }, c.catchup <= 0, c.catchup >= L.MAX_CATCHUP)),
+        h('p', { class: 'hint', text: c.custom ? 'Das ist deine eigene Einstellung.' : 'Vorgabe vom Admin. Was du änderst, gilt nur für dich.' }),
+        c.custom ? btn('Zurück zur Vorgabe', 'link', function () {
+          writePriv('settings', { times: null, counts: null, catchup: null });
+          planChanged();
+          sheet.draw();
+        }) : null);
+    }
     function settingsView() {
       const t = times(), u = S.authUser || {};
       const fileInput = h('input', { id: 'importFile', type: 'file', accept: 'application/json,.json', onchange: function (e) { importBackup(e.target.files && e.target.files[0]); e.target.value = ''; } });
@@ -2285,17 +2444,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
           h('div', { class: 'seg', role: 'group', 'aria-label': 'Darstellung' }, [['auto', 'Auto'], ['light', 'Hell'], ['dark', 'Dunkel'], ['black', 'Schwarz']].map(function (o) {
             return h('button', { type: 'button', text: o[1], 'aria-pressed': String((settings().theme || 'auto') === o[0]), onclick: function () { writePriv('settings', { theme: o[0] }); setTheme(o[0]); } });
           }))),
-        h('div', { class: 'section' }, h('h3', { text: 'Etappen' }),
-          h('div', { class: 'times' }, L.BLOCKS.map(function (b) {
-            const input = h('input', { id: 'time_' + b, type: 'time', value: t[b], onchange: function () {
-              if (L.parseTime(input.value) === null) { input.value = t[b]; return; }
-              const patch = { times: {} };
-              patch.times[b] = input.value;
-              writePriv('settings', patch);
-              if (settings().push) savePushTimes();
-            } });
-            return h('label', { class: 'field' }, h('span', { text: L.BLOCK_NAMES[b] }), input);
-          }))),
+        planSection(),
         h('div', { class: 'section' },
           h('label', { class: 'switchrow' }, h('span', { text: 'Haptik' }),
             h('input', { id: 'hapticsToggle', type: 'checkbox', role: 'switch', checked: hapticsOn(), onchange: function (e) {
@@ -2304,7 +2453,7 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
             } })),
           pushRow(t)),
         standalone() ? null : h('p', { class: 'hint', text: 'Tipp: In Safari „Teilen“ → „Zum Home-Bildschirm“. Dann startet Lumen wie eine App, geht offline und kann dich erinnern.' }),
-        h('details', { class: 'more' }, h('summary', { text: 'Konto und Daten' }),
+        h('details', { class: 'more', open: accountOpen, ontoggle: function (e) { accountOpen = e.target.open; } }, h('summary', { text: 'Konto und Daten' }),
           h('div', {},
             h('p', { class: 'hint', text: 'Angemeldet als ' + (u.email || '') + (S.lastFacts ? ' · Fakten bis ' + L.formatDay(S.lastFacts) : '') }),
             nameField(),

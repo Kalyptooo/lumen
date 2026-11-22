@@ -100,6 +100,13 @@ button.sort.on { color: var(--text); text-decoration: underline; }
 .news ul { margin: 4px 0 10px; padding-left: 20px; }
 .person .kpis { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
 .stack { display: flex; flex-direction: column; gap: 10px; }
+.planrow { display: grid; grid-template-columns: minmax(0, 1fr) 112px 118px; align-items: center; gap: 8px; max-width: 26rem; }
+.planrow .wide { grid-column: 1 / 3; }
+.planrow input[type="time"] { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--bg); }
+.stepper { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; background: var(--surface-2); border-radius: 11px; }
+.stepper button { height: 44px; padding: 0; border: 0; background: transparent; font-size: 1.25rem; cursor: pointer; }
+.stepper button[disabled] { opacity: .3; cursor: default; }
+.stepper output { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -211,6 +218,8 @@ button.sort.on { color: var(--text); text-decoration: underline; }
       S.wish = S.pub.wish || '';
       S.notice = (S.pub.notice && S.pub.notice.text) || '';
       S.times = Object.assign({}, DEFAULT_TIMES, S.pub.defaultTimes || {});
+      S.counts = planCounts(S.pub.defaultCounts);
+      S.catchup = Number.isInteger(S.pub.defaultCatchup) ? S.pub.defaultCatchup : 2;
       C.content.setOverrides(S.pub.overrides);
       S.phase = 'ready';
       loadTitles();
@@ -522,13 +531,37 @@ button.sort.on { color: var(--text); text-decoration: underline; }
           savePublic({ areaWeights: normWeights(S.weights), wish: S.wish.trim().slice(0, 300), settingsChangedAt: nowISO() }, 'Gespeichert. Gilt ab der nächsten Wochenladung.');
         }, S.busy || !changed), changed ? h('span', { class: 'hint', text: 'Nicht gespeicherte Änderungen' }) : null),
         S.pub.settingsChangedAt ? h('p', { class: 'hint', text: 'Zuletzt geändert am ' + fmtDay(S.pub.settingsChangedAt) + '.' }) : null),
-      h('div', { class: 'card' }, h('h2', { text: 'Uhrzeiten der Etappen' }),
-        h('p', { class: 'hint', text: 'Standard für alle. Wer selbst Uhrzeiten eingestellt hat, behält die eigenen.' }),
-        h('div', { class: 'row' }, [['morgen', 'Morgen'], ['mittag', 'Mittag'], ['abend', 'Abend']].map(function (b) {
-          return h('label', { class: 'field' }, h('span', { text: b[1] }), h('input', { type: 'time', value: S.times[b[0]], onchange: function (e) { S.times[b[0]] = e.target.value || DEFAULT_TIMES[b[0]]; } }));
-        })),
-        h('div', { class: 'row' }, btn('Uhrzeiten speichern', 'primary', function () { savePublic({ defaultTimes: Object.assign({}, S.times) }, 'Uhrzeiten gespeichert.'); }, S.busy)))
+      planCard()
     ];
+  }
+  function planCounts(src) {
+    const out = {};
+    let sum = 0;
+    ['morgen', 'mittag', 'abend'].forEach(function (b) { const n = Number((src || {})[b]); out[b] = Number.isInteger(n) && n > 0 ? n : 0; sum += out[b]; });
+    return sum >= 1 && sum <= 10 ? out : { morgen: 1, mittag: 1, abend: 3 };
+  }
+  function stepper(label, value, onminus, onplus, minusOff, plusOff) {
+    return h('div', { class: 'stepper', role: 'group', 'aria-label': label },
+      h('button', { type: 'button', text: '−', 'aria-label': label + ': weniger', disabled: minusOff, onclick: onminus }),
+      h('output', { text: String(value) }),
+      h('button', { type: 'button', text: '+', 'aria-label': label + ': mehr', disabled: plusOff, onclick: onplus }));
+  }
+  /* The day plan for everyone: how many new facts at which time, and how many missed ones per day. */
+  function planCard() {
+    const total = S.counts.morgen + S.counts.mittag + S.counts.abend;
+    return h('div', { class: 'card' }, h('h2', { text: 'Tagesplan für alle' }),
+      h('p', { class: 'hint', text: 'Wie viele neue Fakten es am Tag gibt und zu welcher Uhrzeit. Wer in Lumen selbst etwas einstellt, behält seine eigenen Werte.' }),
+      [['morgen', 'Morgen'], ['mittag', 'Mittag'], ['abend', 'Abend']].map(function (b) {
+        return h('div', { class: 'planrow' }, h('span', { text: b[1] }),
+          h('input', { type: 'time', 'aria-label': b[1] + ', Uhrzeit', value: S.times[b[0]], onchange: function (e) { S.times[b[0]] = e.target.value || DEFAULT_TIMES[b[0]]; } }),
+          stepper(b[1], S.counts[b[0]], function () { S.counts[b[0]] -= 1; render(); }, function () { S.counts[b[0]] += 1; render(); }, S.counts[b[0]] === 0 || total <= 1, total >= 10));
+      }),
+      h('div', { class: 'planrow' }, h('span', { class: 'wide', text: 'Nachholen pro Tag, höchstens' }),
+        stepper('Nachholen pro Tag', S.catchup, function () { S.catchup -= 1; render(); }, function () { S.catchup += 1; render(); }, S.catchup <= 0, S.catchup >= 5)),
+      h('p', { class: 'hint', text: total + (total === 1 ? ' neuer Fakt' : ' neue Fakten') + ' am Tag.' + (total > 5 ? ' Bei mehr als 5 schreibt die Wochenaufgabe entsprechend mehr Fakten und braucht dafür mehr von deinem Wochenlimit.' : '') }),
+      h('div', { class: 'row' }, btn('Tagesplan speichern', 'primary', function () {
+        savePublic({ defaultTimes: Object.assign({}, S.times), defaultCounts: Object.assign({}, S.counts), defaultCatchup: S.catchup }, 'Tagesplan gespeichert. Gilt sofort für alle ohne eigene Einstellung.');
+      }, S.busy)));
   }
   function normWeights(src) {
     const out = {};

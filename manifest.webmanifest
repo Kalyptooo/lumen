@@ -1,7 +1,7 @@
 {
   "name": "Lumen",
   "short_name": "Lumen",
-  "description": "Fünf Fakten am Tag, Quiz und Auffrischung.",
+  "description": "Jeden Tag ein paar Fakten, Quiz und Auffrischung.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",
