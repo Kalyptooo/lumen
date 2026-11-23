@@ -8,7 +8,9 @@ service cloud.firestore {
     function email() { return request.auth.token.email.lower(); }
     function verified() { return signedIn() && request.auth.token.email_verified == true; }
     function access() { return get(/databases/$(database)/documents/config/access).data; }
-    function isAdmin() { return verified() && email() in access().adminEmails; }
+    // Admin rights need a password entry within the last 12 hours, so a forgotten open session or a stolen sign-in expires.
+    function recentLogin() { return request.auth.token.auth_time > request.time.toMillis() / 1000 - 43200; }
+    function isAdmin() { return verified() && recentLogin() && email() in access().adminEmails; }
     function isMember() { return verified() && (email() in access().invited || email() in access().adminEmails); }
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
 
@@ -17,8 +19,9 @@ service cloud.firestore {
 
     match /members/{uid} {
       allow read: if isSelf(uid) || isAdmin();
-      allow write: if isSelf(uid) && isMember();
-      allow delete: if isAdmin();
+      // The stored address must be the person's own: the admin page acts on it when locking someone.
+      allow create, update: if isSelf(uid) && isMember() && request.resource.data.get('email', '').lower() == email();
+      allow delete: if (isSelf(uid) && isMember()) || isAdmin();
     }
     match /digest/{uid} {
       allow read: if (isSelf(uid) && isMember()) || isAdmin();

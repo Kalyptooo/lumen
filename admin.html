@@ -4,25 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src https://lumen-f76be.firebaseapp.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<script>if (window.top !== window.self) { document.documentElement.textContent = ''; throw new Error('Lumen Admin darf nicht eingebettet werden.'); }</script>
 <title>Lumen Admin</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
 /* Admin page: overview of everyone's progress, who may use Lumen, and what the weekly task should write. */
 :root {
-  --bg: #f2f5f3; --surface: #ffffff; --surface-2: #e6ecea; --text: #17211d; --muted: #52605a; --line: #d2dad6;
-  --accent: #0f6b5f; --on-accent: #ffffff; --good: #1a6b41; --warn: #7d5200; --warn-soft: #faefd6; --danger: #a8281f;
+  --bg: #f2f2f7; --surface: #ffffff; --surface-2: #e9e9ee; --seg-on: #ffffff; --text: #000000; --muted: #6c6c70; --line: rgba(60, 60, 67, .18);
+  --accent: #c75300; --on-accent: #ffffff; --good: #248a3d; --warn: #b25000; --warn-soft: #fff1dd; --danger: #d70015;
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-read: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-read: var(--font-ui);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1412; --surface: #181f1c; --surface-2: #232c28; --text: #e7edea; --muted: #a2afa9; --line: #2f3a35;
-    --accent: #72cdb9; --on-accent: #06211c; --good: #7fd4a0; --warn: #e6bd6b; --warn-soft: #33280e; --danger: #f1a39d; color-scheme: dark;
+    --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --seg-on: #636366; --text: #ffffff; --muted: #98989f; --line: rgba(84, 84, 88, .55);
+    --accent: #ff9f0a; --on-accent: #000000; --good: #30d158; --warn: #ffb340; --warn-soft: #33260f; --danger: #ff6961; color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
-  --bg: #0f1412; --surface: #181f1c; --surface-2: #232c28; --text: #e7edea; --muted: #a2afa9; --line: #2f3a35;
-  --accent: #72cdb9; --on-accent: #06211c; --good: #7fd4a0; --warn: #e6bd6b; --warn-soft: #33280e; --danger: #f1a39d; color-scheme: dark;
+:root[data-theme="dark"], :root[data-theme="black"] {
+  --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --seg-on: #636366; --text: #ffffff; --muted: #98989f; --line: rgba(84, 84, 88, .55);
+  --accent: #ff9f0a; --on-accent: #000000; --good: #30d158; --warn: #ffb340; --warn-soft: #33260f; --danger: #ff6961; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -107,11 +109,26 @@ button.sort.on { color: var(--text); text-decoration: underline; }
 .stepper button { height: 44px; padding: 0; border: 0; background: transparent; font-size: 1.25rem; cursor: pointer; }
 .stepper button[disabled] { opacity: .3; cursor: default; }
 .stepper output { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+body { -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; }
+.wrap { padding-top: max(16px, calc(env(safe-area-inset-top, 0px) + 14px)); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 48px); }
+header h1 { font-size: 2.125rem; font-weight: 800; letter-spacing: -.022em; line-height: 1.08; }
+.card { border: 0; border-radius: 22px; }
+.kpi { border: 0; border-radius: 18px; }
+.btn { border: 0; border-radius: 999px; }
+.btn.danger { border: 1px solid var(--danger); }
+.tabs { border-radius: 18px; }
+.tabs button { border-radius: 14px; }
+.tabs button[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--seg-on); }
+input[type="email"], input[type="password"], input[type="text"], textarea, select, .planrow input[type="time"] { border: 0; border-radius: 14px; background: var(--surface-2); font-size: max(1rem, 16px); }
+@media (max-width: 40rem) { header h1 { font-size: 1.875rem; } }
 </style>
 </head>
 <body>
 <div class="wrap" id="root"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="lumen-touch.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -174,13 +191,53 @@ button.sort.on { color: var(--text); text-decoration: underline; }
 
   function boot() {
     render();
+    if (window.LumenTouch) window.LumenTouch.haptics();
     if (!C || !C.ready) { S.phase = 'error'; render(); return; }
-    C.auth.onAuthStateChanged(function (u) {
+    C.auth.onAuthStateChanged(async function (u) {
       S.user = u;
       if (!u) { S.phase = 'signin'; render(); return; }
       if (!u.emailVerified) { S.phase = 'verify'; render(); return; }
+      if (!(await loginIsFresh(u))) { S.phase = 'locked'; render(); return; }
       load();
     });
+    ['pointerdown', 'touchstart', 'keydown'].forEach(function (type) {
+      document.addEventListener(type, function () { lastActive = Date.now(); }, { capture: true, passive: true });
+    });
+    setInterval(function () {
+      if (S.phase === 'ready' && C.firebase && Date.now() - lastActive > IDLE_MINUTES * 60000) { S.phase = 'locked'; S.form.password = ''; render(); }
+    }, 30000);
+  }
+  /* The admin area asks for the password again after a pause and at least every 12 hours. The database rules enforce the 12 hours too. */
+  const FRESH_HOURS = 12, IDLE_MINUTES = 20;
+  let lastActive = Date.now();
+  async function loginIsFresh(u) {
+    try {
+      if (!u.getIdTokenResult) return true;
+      const t = await u.getIdTokenResult();
+      return Date.now() - Date.parse(t.authTime) < FRESH_HOURS * 3600000;
+    } catch (e) { return true; }
+  }
+  async function unlock() {
+    const F = S.form;
+    F.busy = true; F.error = ''; render();
+    try {
+      const cred = C.firebase.auth.EmailAuthProvider.credential(S.user.email, F.password);
+      await S.user.reauthenticateWithCredential(cred);
+      await S.user.getIdToken(true);
+      F.password = ''; F.busy = false; lastActive = Date.now();
+      await load();
+      return;
+    } catch (e) { F.error = C.message(e); }
+    F.busy = false; render();
+  }
+  function lockCard() {
+    const F = S.form;
+    return h('div', { class: 'card', style: 'max-width:26rem' }, h('h2', { text: 'Passwort bestätigen' }),
+      h('p', { class: 'muted', text: 'Zum Schutz fragt der Admin-Bereich nach 20 Minuten Pause und spätestens alle 12 Stunden wieder nach deinem Passwort.' }),
+      h('label', { class: 'field' }, h('span', { text: 'Passwort' }), h('input', { type: 'password', value: F.password, autocomplete: 'current-password',
+        oninput: function (e) { F.password = e.target.value; }, onkeydown: function (e) { if (e.key === 'Enter') unlock(); } })),
+      F.error ? h('p', { class: 'error', role: 'alert', text: F.error }) : null,
+      btn(F.busy ? 'Einen Moment …' : 'Entsperren', 'primary', unlock, F.busy));
   }
   async function signIn() {
     const F = S.form;
@@ -333,6 +390,7 @@ button.sort.on { color: var(--text); text-decoration: underline; }
     root.appendChild(h('header', {}, h('h1', { text: 'Lumen Admin' }),
       S.user && S.phase !== 'signin' ? h('div', { class: 'row' }, h('a', { href: './', class: 'muted', text: 'Zur Lernseite' }), h('span', { class: 'muted hide-sm', text: S.user.email }), btn('Abmelden', 'secondary small', signOut)) : null));
     if (S.phase === 'signin') { root.appendChild(signinCard()); return; }
+    if (S.phase === 'locked') { root.appendChild(lockCard()); return; }
     if (S.phase === 'verify') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'E-Mail-Adresse noch nicht bestätigt' }), h('p', { class: 'muted', text: 'Bestätige zuerst deine Adresse über die Lernseite und lade diese Seite dann neu.' }))); return; }
     if (S.phase === 'denied') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Kein Admin-Zugang' }), h('p', { class: 'muted', text: 'Dieses Konto ist kein Admin.' }), h('a', { href: './', text: 'Zur Lernseite' }))); return; }
     if (S.phase === 'error') { root.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Die Daten sind gerade nicht erreichbar' }), btn('Erneut versuchen', 'primary', load))); return; }
