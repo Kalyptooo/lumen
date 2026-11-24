@@ -69,7 +69,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 .top {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px;
   /* iOS blurs a strip below the status bar in home-screen apps; keep the header clear of it. */
-  padding-top: max(6px, calc(env(safe-area-inset-top, 0px) + 22px)); padding-bottom: 2px;
+  padding-top: max(6px, calc(env(safe-area-inset-top, 0px) + 34px)); padding-bottom: 2px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
 .brand { display: flex; flex-direction: column; min-width: 0; }
@@ -375,8 +375,8 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
 
 /* ---------- Apple-style layer: large titles, borderless grouped cards, capsule buttons, a floating tab bar ---------- */
 body { -webkit-font-smoothing: antialiased; }
-.top { min-height: 64px; padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: 8px; }
-.brand h1 { font-size: 2.125rem; font-weight: 800; letter-spacing: -.022em; line-height: 1.08; }
+.top { min-height: 64px; padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: 4px; }
+.brand h1 { font-size: 2.125rem; font-weight: 800; letter-spacing: -.022em; line-height: 1.12; }
 .status { font-size: .875rem; margin-top: 2px; }
 .top .iconbtn { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--surface-2); font-size: 1.125rem; font-weight: 700; }
 .main { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); }
@@ -456,7 +456,8 @@ details.more { border-top: .5px solid var(--line); }
 /* ---------- Du page ---------- */
 .tabs { grid-template-columns: repeat(4, 1fr); width: min(calc(100% - 24px), 25rem); }
 .main { overflow-x: hidden; touch-action: pan-y; }
-.view { will-change: transform; }
+.main { position: relative; }
+.view.peer, .view.peer * { animation-duration: 0s !important; animation-delay: 0s !important; }
 .backbtn { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; min-height: 32px; margin: 0 0 2px -8px; padding: 0 8px 0 2px; border: 0; background: transparent; color: var(--brand); font-size: 1.0625rem; font-weight: 500; }
 .backbtn svg { width: 22px; height: 22px; stroke-width: 2.4; }
 .top .iconbtn svg { width: 22px; height: 22px; }
@@ -551,7 +552,10 @@ details.more { border-top: .5px solid var(--line); }
   .toast:not([hidden]) { animation: toast-in .24s cubic-bezier(.2, .8, .2, 1); }
   @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0); } }
   .toast.swap:not([hidden]) { animation: fade .18s ease-out; }
-  .sheet.leaving { transition: transform .2s ease-in; transform: translateY(100%) !important; animation: none; }
+  .sheet { animation: sheet-up .36s cubic-bezier(.2, .9, .25, 1); }
+  .scrim { animation: fade .25s ease-out; }
+  @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+  .sheet.leaving { transition: transform .22s cubic-bezier(.4, 0, 1, 1); transform: translateY(100%) !important; animation: none; }
   .scrim.leaving { transition: opacity .2s ease-in; opacity: 0; animation: none; }
   .switchrow input[type="checkbox"] { transition: background-color .2s, background-position .2s; }
   .view article[data-key] { animation: enter .24s cubic-bezier(.2, .8, .2, 1); }
@@ -1880,6 +1884,8 @@ details.more { border-top: .5px solid var(--line); }
     VIEWS.forEach(function (pair, i) {
       const el = $(pair[1]), show = S.tab === pair[0];
       if (show && el.hidden && before && S.phase === 'ready') slideIn(el, i > VIEWS.indexOf(before) ? 'in-r' : 'in-l');
+      if (!show && el === S.swipePeer) return;
+      if (!show) el.classList.remove('peer');
       el.hidden = !show;
     });
     document.querySelectorAll('.tabs button').forEach(function (b) {
@@ -2949,19 +2955,55 @@ details.more { border-top: .5px solid var(--line); }
     if (!t || t.disabled || t.closest('.haptic, .hx')) return;
     tick('single');
   }, true);
-  /* Swipe left or right to move between the tabs (or back from a Du sub-page). The page follows the finger,
-     glides out when released far or fast enough, and springs back otherwise. */
+  /* Swipe left or right to move between the tabs (or back from a Du sub-page). Like on iOS, the next page
+     slides in right beside the current one and both follow the finger; release far or fast enough to switch,
+     otherwise both spring back. */
   (function () {
     const order = ['today', 'practice', 'archive', 'you'];
-    const ease = 'cubic-bezier(.2, .8, .2, 1)';
+    const PAINT = { today: renderToday, practice: renderPractice, archive: renderArchive, you: renderYou };
+    const ease = 'cubic-bezier(.25, .9, .3, 1)';
+    const GAP = 24;
     let g = null;
-    const viewEl = function () { return $(VIEWS.filter(function (p) { return p[0] === S.tab; })[0][1]); };
+    const viewOf = function (tab) { return $(VIEWS.filter(function (p) { return p[0] === tab; })[0][1]); };
     const target = function (dx) {
       if (S.tab === 'you' && S.youPage) return dx > 0 ? 'back' : null;
       const i = order.indexOf(S.tab) + (dx < 0 ? 1 : -1);
       return i >= 0 && i < order.length ? order[i] : null;
     };
-    const clear = function (el) { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; };
+    const reset = function (el) { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; el.style.willChange = ''; };
+    const dropPeer = function (s) {
+      const p = s.peer;
+      if (!p) return;
+      s.peer = null;
+      if (p.owner !== s) return;
+      s.peer = null; s.peerTab = null; S.swipePeer = null;
+      p.style.cssText = '';
+      p.hidden = true;
+      p.classList.remove('peer');
+    };
+    /* Show the neighbouring page beside the current one, lined up with the top of the screen. */
+    const preparePeer = function (s, to, dir) {
+      if (s.peerTab === to) return;
+      dropPeer(s);
+      if (!to || to === 'back') return;
+      const p = viewOf(to);
+      PAINT[to]();
+      p.classList.remove('in-r', 'in-l');
+      p.classList.add('peer');
+      p.style.cssText = 'position:absolute;left:' + s.el.offsetLeft + 'px;width:' + s.el.offsetWidth + 'px;top:' +
+        ($('main').scrollTop + s.padTop) + 'px;transition:none;will-change:transform;pointer-events:none';
+      p.hidden = false;
+      s.peer = p; s.peerTab = to; s.peerDir = dir; S.swipePeer = p; p.owner = s;
+    };
+    const place = function (s, d, ms) {
+      const tr = ms ? 'transform ' + ms + 'ms ' + ease + ', opacity ' + ms + 'ms ' + ease : 'none';
+      s.el.style.transition = tr;
+      s.el.style.transform = d ? 'translate3d(' + d + 'px,0,0)' : '';
+      if (s.peer) {
+        s.peer.style.transition = tr;
+        s.peer.style.transform = 'translate3d(' + (d + s.peerDir * (s.width + GAP)) + 'px,0,0)';
+      }
+    };
     $('main').addEventListener('touchstart', function (e) {
       g = null;
       if (e.touches.length !== 1 || S.phase !== 'ready' || S.sheets.length || e.target.closest('.chips, input, textarea, select, .options')) return;
@@ -2974,18 +3016,20 @@ details.more { border-top: .5px solid var(--line); }
         if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
         if (Math.abs(dx) < 1.3 * Math.abs(dy)) { g.lock = 'v'; return; }
         g.lock = 'h';
-        g.el = viewEl();
-        g.x0 = x; g.width = $('main').clientWidth || 360;
-        if (motion()) g.el.style.transition = 'none';
+        g.el = viewOf(S.tab);
+        g.x0 = x; g.width = g.el.offsetWidth || 360;
+        g.padTop = parseFloat(getComputedStyle($('main')).paddingTop) || 0;
+        if (motion()) g.el.style.willChange = 'transform';
       }
       const d = x - g.x0;
       g.dx = d;
       g.samples.push([Date.now(), d]);
       if (g.samples.length > 5) g.samples.shift();
       if (!motion()) return;
-      const shown = target(d) ? d : d * 0.25;
-      g.el.style.transform = 'translateX(' + shown + 'px)';
-      g.el.style.opacity = String(1 - Math.min(0.35, Math.abs(shown) / g.width * 0.6));
+      const to = target(d), dir = d < 0 ? 1 : -1;
+      preparePeer(g, to, dir);
+      place(g, to ? d : d * 0.25, 0);
+      g.el.style.opacity = to === 'back' ? String(1 - Math.min(0.5, Math.abs(d) / g.width * 0.6)) : '';
     }, { passive: true });
     const end = function () {
       const s = g;
@@ -2996,26 +3040,36 @@ details.more { border-top: .5px solid var(--line); }
       const to = target(s.dx);
       const go = !!to && (Math.abs(s.dx) > s.width * 0.3 || (Math.abs(s.dx) > 40 && Math.abs(v) > 0.35 && Math.sign(v) === Math.sign(s.dx)));
       const el = s.el;
+      if (!motion()) {
+        if (go && to === 'back') openYou(null);
+        else if (go) { S.tab = to; render(); scrollTop(); }
+        return;
+      }
       if (!go) {
-        if (!motion()) return;
-        el.style.transition = 'transform .3s ' + ease + ', opacity .3s ' + ease;
-        el.style.transform = '';
+        place(s, 0, 300);
         el.style.opacity = '';
-        setTimeout(function () { el.style.transition = ''; }, 320);
+        setTimeout(function () { reset(el); dropPeer(s); }, 320);
         return;
       }
       tick('single');
-      const finish = function () {
-        clear(el);
-        if (to === 'back') openYou(null);
-        else { S.tab = to; render(); scrollTop(); }
-      };
-      if (!motion()) { finish(); return; }
-      const ms = Math.round(Math.max(110, Math.min(200, (s.width - Math.abs(s.dx)) / Math.max(0.8, Math.abs(v)))));
-      el.style.transition = 'transform ' + ms + 'ms ease-out, opacity ' + ms + 'ms ease-out';
-      el.style.transform = 'translateX(' + (Math.sign(s.dx) * s.width * 0.45) + 'px)';
-      el.style.opacity = '0';
-      setTimeout(finish, ms);
+      const full = to === 'back' ? s.width : s.width + GAP;
+      const ms = Math.round(Math.max(170, Math.min(320, (full - Math.abs(s.dx)) / Math.max(0.9, Math.abs(v)) * 1.4)));
+      place(s, Math.sign(s.dx) * full, ms);
+      if (to === 'back') el.style.opacity = '0.4';
+      setTimeout(function () {
+        if (to === 'back') { reset(el); openYou(null); return; }
+        const p = s.peer;
+        S.swipePeer = null;
+        if (p) {
+          p.style.cssText = '';
+          /* The page is already in place: let its own small animations stay quiet a moment longer. */
+          setTimeout(function () { p.classList.remove('peer'); }, 800);
+        }
+        S.tab = to;
+        reset(el);
+        render();
+        scrollTop();
+      }, ms);
     };
     $('main').addEventListener('touchend', end, { passive: true });
     $('main').addEventListener('touchcancel', end, { passive: true });
