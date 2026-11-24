@@ -18,3 +18,8 @@ jobs:
       - run: node tools/send-reminders.mjs
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+      # Once an hour: how much of the free limits Lumen uses (admin page, tab "Auslastung"). Never blocks the reminders.
+      - run: node tools/usage-report.mjs
+        continue-on-error: true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
