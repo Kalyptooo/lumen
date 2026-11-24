@@ -1,64 +1,35 @@
 // Measures how much of the free limits Lumen uses and stores the result for the admin page (tab "Auslastung").
 // Run by .github/workflows/reminders.yml after the reminders; does its work at most once an hour.
-// Writes only the field `usage` of config/access (readable by admins only; no rule change needed).
+// Writes the fields `usage`, `watch` and `events` of config/access (readable by admins only; no rule change needed).
+// Also the hourly watcher: new sign-ups, fact reports, app errors, tight limits, facts running out and a silent weekly
+// task become messages for the dashboard inbox (see tools/notify.mjs and CONNECT.md).
 // Measured:
 //   - Firestore reads, writes, deletes per quota day (Cloud Monitoring; needs the role "Monitoring Viewer" for the
 //     service account, otherwise the admin page explains how to grant it)
 //   - stored Firestore data (estimated from the documents, once a day)
 //   - size of the published website (this checkout)
 //   - number of accounts (Firebase Authentication)
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+import { serviceAccount, accessToken, fieldsOf, patchFields } from './fb-rest.mjs';
+import { mergeEvents } from './notify.mjs';
 
-if (!process.env.FIREBASE_SA) { console.log('FIREBASE_SA fehlt: keine Auslastung gemessen.'); process.exit(0); }
-const sa = JSON.parse(process.env.FIREBASE_SA);
+const sa = serviceAccount();
+if (!sa) { console.log('FIREBASE_SA fehlt: keine Auslastung gemessen.'); process.exit(0); }
 const project = sa.project_id;
 const DB = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents`;
 const HOUR = 3600000, DAY = 24 * HOUR;
-
-const b64url = (s) => Buffer.from(s).toString('base64url');
-async function accessToken() {
-  const now = Math.floor(Date.now() / 1000);
-  const head = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claims = b64url(JSON.stringify({ iss: sa.client_email, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3000, scope: 'https://www.googleapis.com/auth/cloud-platform' }));
-  const sig = crypto.createSign('RSA-SHA256').update(`${head}.${claims}`).sign(sa.private_key).toString('base64url');
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${claims}.${sig}` })
-  });
-  if (!res.ok) throw new Error('Anmeldung beim Dienstkonto fehlgeschlagen: ' + res.status);
-  return (await res.json()).access_token;
-}
-function plain(v) {
-  if (!v || typeof v !== 'object') return v;
-  if ('stringValue' in v) return v.stringValue;
-  if ('integerValue' in v) return Number(v.integerValue);
-  if ('doubleValue' in v) return Number(v.doubleValue);
-  if ('booleanValue' in v) return v.booleanValue;
-  if ('nullValue' in v) return null;
-  if ('timestampValue' in v) return v.timestampValue;
-  if ('arrayValue' in v) return (v.arrayValue.values || []).map(plain);
-  if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, plain(x)]));
-  return v;
-}
-function typed(v) {
-  if (v === null || v === undefined) return { nullValue: null };
-  if (typeof v === 'boolean') return { booleanValue: v };
-  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-  if (typeof v === 'string') return { stringValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(typed) } };
-  return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typed(x)])) } };
-}
+const SITE = 'https://kalyptooo.github.io/lumen/', ADMIN = SITE + 'admin.html#';
 // The Firestore free quota resets at midnight Pacific time.
 const pacificDate = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
 const viennaDate = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
 const keepLast = (list, item, n) => list.filter((x) => x && x.date !== item.date).concat([item]).slice(-n);
 
-const token = await accessToken();
+const token = await accessToken(sa);
 const auth = { authorization: `Bearer ${token}` };
-const access = await (await fetch(`${DB}/config/access`, { headers: auth })).json();
-const old = plain({ mapValue: { fields: access.fields || {} } }).usage || {};
+const accessDoc = fieldsOf(await (await fetch(`${DB}/config/access`, { headers: auth })).json());
+const old = accessDoc.usage || {};
 if (old.at && Date.now() - Date.parse(old.at) < 55 * 60000 && !process.env.USAGE_FORCE) {
   console.log('Auslastung: zuletzt vor weniger als einer Stunde gemessen.');
   process.exit(0);
@@ -146,9 +117,70 @@ try {
   if (res.ok) usage.accounts = Number(body.recordsCount || 0);
 } catch (e) { /* keep the last number */ }
 
-const res = await fetch(`${DB}/config/access?updateMask.fieldPaths=usage`, {
-  method: 'PATCH', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ fields: { usage: typed(usage) } })
-});
-if (!res.ok) { console.log('Auslastung nicht gespeichert: ' + res.status); process.exit(1); }
+/* ---------- watcher: turn what happened into messages for the dashboard (tools/notify.mjs) ---------- */
+const U = createRequire(import.meta.url)('../lumen-usage.js');
+const watch = Object.assign({}, accessDoc.watch || {});
+const first = !watch.at;
+const add = [];
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+try {
+  const [members, digests] = await Promise.all([listAll(`${DB}/members`), listAll(`${DB}/digest`)]);
+  const names = {};
+  for (const d of members) { const f = fieldsOf(d); names[d.name.split('/').pop()] = f.name || f.email || 'Jemand'; }
+  for (const d of digests) { const f = fieldsOf(d), uid = d.name.split('/').pop(); names[uid] = names[uid] || f.name || 'Jemand'; }
+
+  // New sign-ups
+  const newMembers = members.filter((d) => watch.membersAt && d.createTime > watch.membersAt);
+  for (const d of newMembers) {
+    const uid = d.name.split('/').pop();
+    add.push({ key: 'member-' + uid, source: 'personen', level: 'info', title: 'Neue Anmeldung: ' + names[uid], text: 'Hat sich bei Lumen registriert.', link: ADMIN + 'people/' + uid });
+  }
+  // New error reports on facts
+  const reports = [], errors = [];
+  for (const d of digests) {
+    const f = fieldsOf(d), uid = d.name.split('/').pop();
+    for (const r of f.reports || []) if (r && r.reportedAt) reports.push({ ...r, uid });
+    for (const e of f.errors || []) if (e && e.at) errors.push({ ...e, uid });
+  }
+  const newReports = reports.filter((r) => watch.reportsAt && r.reportedAt > watch.reportsAt);
+  if (newReports.length) {
+    const last = newReports.map((r) => r.reportedAt).sort().pop();
+    add.push({ key: 'reports-' + last, source: 'meldungen', level: 'warn', title: plural(newReports.length, 'neue Fehlermeldung', 'neue Fehlermeldungen') + ' zu Fakten',
+      text: newReports.slice(0, 3).map((r) => names[r.uid] + ': ' + (r.note || r.factId)).join(' · '), link: ADMIN + 'reports' });
+  }
+  // App errors on people's devices (index.html stores them in the person's digest)
+  const newErrors = errors.filter((e) => watch.errorsAt && e.at > watch.errorsAt);
+  if (newErrors.length) {
+    const last = newErrors.map((e) => e.at).sort().pop();
+    add.push({ key: 'errors-' + last, source: 'app', level: 'warn', title: plural(newErrors.length, 'Fehler', 'Fehler') + ' in der App',
+      text: newErrors.slice(0, 3).map((e) => names[e.uid] + ': ' + e.msg + (e.where ? ' (' + e.where + ')' : '')).join(' · '), link: ADMIN + 'people/' + newErrors[0].uid });
+  }
+  const maxOf = (list, k, cur) => list.map((x) => x[k]).concat([cur || '']).sort().pop();
+  watch.membersAt = maxOf(members, 'createTime', watch.membersAt) || new Date(now).toISOString();
+  watch.reportsAt = maxOf(reports, 'reportedAt', watch.reportsAt) || new Date(now).toISOString();
+  watch.errorsAt = maxOf(errors, 'at', watch.errorsAt) || new Date(now).toISOString();
+
+  // Free limits
+  const a = U.assess(usage, members.length, now);
+  if (a.verdict.level !== 'ok') {
+    const which = a.items.filter((i) => i.level === a.verdict.level).map((i) => i.key).join('-');
+    add.push({ key: 'usage-' + a.verdict.level + '-' + which + '-' + pacificDate(now), source: 'auslastung', level: a.verdict.level, title: a.verdict.title, text: a.verdict.text, link: ADMIN + 'usage' });
+  }
+  if (a.lacksAccess) add.push({ key: 'usage-access', source: 'auslastung', level: 'info', title: 'Auslastung: Zahlen der Datenbank noch nicht freigegeben', text: 'Einmal freigeben, die Schritte stehen im Tab Auslastung.', link: ADMIN + 'usage' });
+} catch (e) { console.log('Wächter: ' + e.message); }
+try {
+  const m = await (await fetch(SITE + 'data/manifest.json?t=' + now)).json();
+  const t = viennaDate(now);
+  const left = m.lastDate ? Math.round((Date.parse(m.lastDate) - Date.parse(t)) / DAY) : null;
+  if (left !== null && left < 7) add.push({ key: 'facts-low-' + m.lastDate, source: 'fakten', level: left < 3 ? 'alert' : 'warn', title: 'Fakten reichen nur noch ' + Math.max(0, left) + ' Tage', text: 'Die Wochenaufgabe füllt sonntags auf. Läuft sie?', link: ADMIN + 'weekly' });
+  const run = m.lastRun;
+  if (run && run.at && now - Date.parse(run.at) > 8 * DAY) add.push({ key: 'weekly-stale-' + (run.batch || run.at), source: 'wochenaufgabe', level: 'warn', title: 'Wochenaufgabe lief seit ' + Math.floor((now - Date.parse(run.at)) / DAY) + ' Tagen nicht', text: 'Prüfe die Routine auf claude.ai.', link: ADMIN + 'weekly' });
+} catch (e) { /* manifest unreachable: next hour */ }
+watch.at = new Date(now).toISOString();
+
+const save = { usage, watch };
+const merged = mergeEvents(accessDoc.events, first ? add.filter((e) => /^(usage|facts|weekly)/.test(e.key)) : add, now);
+if (merged.added.length) save.events = merged.events;
+await patchFields(`${DB}/config/access`, auth, save);
 const t = usage.firestore && usage.firestore.days.find((d) => d.date === usage.firestore.today);
-console.log(`Auslastung gespeichert. Lesen heute: ${t ? t.reads : '?'}${usage.monitoring.ok ? '' : ' (Monitoring: ' + usage.monitoring.error + ')'}`);
+console.log(`Auslastung gespeichert. Lesen heute: ${t ? t.reads : '?'}${usage.monitoring.ok ? '' : ' (Monitoring: ' + usage.monitoring.error + ')'}. Neue Meldungen: ${merged.added.length}`);
