@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Haptik-Test</title>
+<title>Haptik-Test 2</title>
 <meta name="robots" content="noindex">
 <style>
 :root { color-scheme: dark; }
@@ -12,63 +12,64 @@ h1 { font-size: 30px; margin: 8px 0 4px; letter-spacing: -.02em; }
 p { margin: 0 0 12px; color: #a1a1a6; }
 .card { background: #1c1c1e; border-radius: 20px; padding: 16px; margin: 14px 0; }
 .card b { display: block; font-size: 19px; margin-bottom: 4px; color: #fff; }
-button { width: 100%; min-height: 56px; margin-top: 10px; border: 0; border-radius: 999px; background: #ff9f0a; color: #000; font: inherit; font-weight: 700; touch-action: manipulation; }
-button:active { opacity: .7; }
+.wrap { position: relative; margin-top: 10px; }
+.btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px; border: 0; border-radius: 999px; background: #ff9f0a; color: #000; font: inherit; font-weight: 700; touch-action: manipulation; box-sizing: border-box; }
+.count { color: #000; margin-left: 6px; }
+.cover { position: absolute; inset: 0; display: block; border-radius: 999px; cursor: pointer; }
+.tiny { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.fill { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.o0 { opacity: 0; }
+.o1 { opacity: .02; }
 .big { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-weight: 600; color: #fff; }
-.big input { transform: scale(1.6); transform-origin: right center; margin-right: 8px; }
-.count { color: #ff9f0a; font-weight: 700; }
 #info { font-size: 13px; color: #8e8e93; word-break: break-word; }
-.hide { position: fixed; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
-<h1>Haptik-Test</h1>
-<p>Tipp jede Nummer ein paar Mal an und merk dir, bei welcher dein iPhone leicht vibriert. Ton auf lautlos stellen ist egal.</p>
+<h1>Haptik-Test 2</h1>
+<p>Danke! Jetzt bitte jede Nummer ein paar Mal antippen. Die Zahl im Knopf zeigt, dass der Tipp angekommen ist. Merk dir, welche vibrieren.</p>
 
-<div class="card"><b>1 · Echter Schalter</b><p>Tipp den Schalter selbst an. Vibriert er nicht, lässt dein iPhone auf Webseiten gar keine Haptik zu.</p>
-  <label class="big">Schalter <input type="checkbox" switch></label></div>
+<div class="card"><b>A · Nur das Wort antippen</b><p>Tipp hier nur auf das Wort „Schalter“, nicht auf den Schalter selbst.</p>
+  <label class="big"><span>Schalter</span> <input type="checkbox" switch></label></div>
 
-<div class="card"><b>2 · Wie Lumen jetzt</b><p>Unsichtbarer Schalter, ausgelöst beim Tippen.</p>
-  <button type="button" id="t2">Testen <span class="count"></span></button></div>
+<div class="card"><b>B · Unsichtbare Fläche mit Schalter</b>
+  <div class="wrap"><span class="btn">Testen<span class="count" id="cB"></span></span>
+    <label class="cover" id="vB"><input type="checkbox" switch class="tiny" tabindex="-1"></label></div></div>
 
-<div class="card"><b>3 · Kurz erzeugt</b><p>Schalter wird nur für den Moment erzeugt und gleich wieder entfernt.</p>
-  <button type="button" id="t3">Testen <span class="count"></span></button></div>
+<div class="card"><b>C · Unsichtbarer Schalter über dem Knopf</b>
+  <div class="wrap"><span class="btn">Testen<span class="count" id="cC"></span></span>
+    <input type="checkbox" switch class="fill o0" id="vC" tabindex="-1"></div></div>
 
-<div class="card"><b>4 · Schon beim Loslassen</b><p>Ausgelöst direkt, wenn der Finger das Display verlässt.</p>
-  <button type="button" id="t4">Testen <span class="count"></span></button></div>
+<div class="card"><b>D · Fast unsichtbarer Schalter über dem Knopf</b>
+  <div class="wrap"><span class="btn">Testen<span class="count" id="cD"></span></span>
+    <input type="checkbox" switch class="fill o1" id="vD" tabindex="-1"></div></div>
 
-<div class="card"><b>5 · Schon beim Berühren</b><p>Ausgelöst, sobald der Finger das Display berührt.</p>
-  <button type="button" id="t5">Testen <span class="count"></span></button></div>
+<div class="card"><b>E · Fläche erscheint beim Berühren</b>
+  <div class="wrap" id="wE"><button type="button" class="btn" id="bE">Testen<span class="count" id="cE"></span></button></div></div>
 
 <p id="info"></p>
 
-<label class="hide" id="hidden2" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
-<label class="hide" id="hidden4" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
-<label class="hide" id="hidden5" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
 <script>
 (function () {
-  function bump(btn) { const c = btn.querySelector('.count'); c.textContent = '· ' + ((parseInt(c.dataset.n || '0', 10) || 0) + 1) + '×'; c.dataset.n = String((parseInt(c.dataset.n || '0', 10) || 0) + 1); }
-  const t2 = document.getElementById('t2'), t3 = document.getElementById('t3'), t4 = document.getElementById('t4'), t5 = document.getElementById('t5');
-  t2.addEventListener('click', function () { document.getElementById('hidden2').click(); bump(t2); });
-  t3.addEventListener('click', function () {
-    const label = document.createElement('label');
-    label.setAttribute('aria-hidden', 'true');
-    label.style.display = 'none';
+  function bump(id) { const c = document.getElementById(id); const n = (parseInt(c.dataset.n || '0', 10) || 0) + 1; c.dataset.n = String(n); c.textContent = '· ' + n + '×'; }
+  document.getElementById('vB').addEventListener('click', function (e) { if (e.target === this) bump('cB'); });
+  document.getElementById('vC').addEventListener('click', function () { bump('cC'); });
+  document.getElementById('vD').addEventListener('click', function () { bump('cD'); });
+  // E: a normal button. On touch a transparent label with a switch is put under the finger, so the tap lands on it.
+  const wE = document.getElementById('wE');
+  let cover = null;
+  wE.addEventListener('touchstart', function () {
+    if (cover) return;
+    cover = document.createElement('label');
+    cover.className = 'cover';
     const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.setAttribute('switch', '');
-    label.appendChild(input);
-    document.head.appendChild(label);
-    label.click();
-    document.head.removeChild(label);
-    bump(t3);
-  });
-  t4.addEventListener('touchend', function () { document.getElementById('hidden4').click(); bump(t4); });
-  t5.addEventListener('touchstart', function () { document.getElementById('hidden5').click(); bump(t5); }, { passive: true });
-  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-  const sw = document.createElement('input'); sw.type = 'checkbox'; sw.setAttribute('switch', '');
-  document.getElementById('info').textContent = 'Gerät: ' + navigator.userAgent + ' · Vom Home-Bildschirm: ' + (standalone ? 'ja' : 'nein') +
-    ' · Schalter-Unterstützung: ' + ('switch' in sw ? 'ja' : 'unbekannt') + ' · vibrate: ' + (typeof navigator.vibrate === 'function' ? 'ja' : 'nein');
+    input.type = 'checkbox'; input.setAttribute('switch', ''); input.className = 'tiny'; input.tabIndex = -1;
+    cover.appendChild(input);
+    cover.addEventListener('click', function (e) { if (e.target === cover) bump('cE'); });
+    wE.appendChild(cover);
+    setTimeout(function () { if (cover) { cover.remove(); cover = null; } }, 700);
+  }, { passive: true });
+  document.getElementById('bE').addEventListener('click', function () { bump('cE'); });
+  document.getElementById('info').textContent = navigator.userAgent;
 })();
 </script>
 </body>
