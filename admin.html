@@ -166,6 +166,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
       else el.setAttribute(k, v === true ? '' : v);
     });
     for (let i = 2; i < arguments.length; i += 1) add(el, arguments[i]);
+    if (tag === 'button' && window.LumenTouch) el.appendChild(window.LumenTouch.label());
     return el;
   }
   function add(el, c) {

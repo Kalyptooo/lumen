@@ -33,25 +33,47 @@
     if (e.isTrusted && Date.now() < ignoreClicksUntil) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
 
-  function haptics() {
-    const label = document.createElement('label');
-    label.setAttribute('aria-hidden', 'true');
-    label.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+  /* Haptics on iPhone: iOS only vibrates when the finger itself lands on a switch. So every button carries a
+     transparent label with a hidden switch over its whole area. The tap hits the label, the switch toggles (that is
+     the tick), and the click still reaches the button once. Scrolling over it works as usual. */
+  const enabled = function () {
+    try { return localStorage.getItem('lumen-haptics') !== 'off'; } catch (e) { return true; }
+  };
+  const stop = function (e) { e.stopPropagation(); };
+  function label() {
+    const l = document.createElement('label');
+    l.className = 'hx';
+    l.setAttribute('aria-hidden', 'true');
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.setAttribute('switch', '');
     input.tabIndex = -1;
-    label.appendChild(input);
-    document.body.appendChild(label);
-    const enabled = function () {
-      try { return localStorage.getItem('lumen-haptics') !== 'off'; } catch (e) { return true; }
-    };
+    input.addEventListener('click', stop);
+    l.appendChild(input);
+    return l;
+  }
+  function equip(root) {
+    (root || document).querySelectorAll('button').forEach(function (b) {
+      if (!b.querySelector(':scope > label.hx')) b.appendChild(label());
+    });
+  }
+  function setEnabled(on) { document.documentElement.classList.toggle('no-hx', !on); }
+  const style = document.createElement('style');
+  style.textContent = 'button:has(> .hx){position:relative}' +
+    '.hx{position:absolute;inset:0;z-index:1;display:block;border-radius:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}' +
+    '.hx input{position:absolute;left:0;top:0;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}' +
+    'button:disabled>.hx,html.no-hx .hx{display:none}';
+  document.head.appendChild(style);
+  setEnabled(enabled());
+
+  /* Admin page: switches on every button already on the page, plus a vibration on Android. */
+  function haptics() {
+    equip(document);
     document.addEventListener('click', function (e) {
       const t = e.target && e.target.closest ? e.target.closest('button, a, [role="button"], input[type="checkbox"], select') : null;
-      if (!t || t.disabled || label.contains(t) || !enabled()) return;
+      if (!t || t.disabled || t.closest('.hx') && t.tagName === 'INPUT' || !enabled()) return;
       if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
-      else label.click();
     }, true);
   }
-  window.LumenTouch = { haptics: haptics };
+  window.LumenTouch = { haptics: haptics, label: label, equip: equip, setEnabled: setEnabled };
 })();

@@ -1314,6 +1314,7 @@ details.more { border-top: .5px solid var(--line); }
       else el.setAttribute(k, v === true ? '' : v);
     });
     for (let i = 2; i < arguments.length; i += 1) append(el, arguments[i]);
+    if (tag === 'button' && window.LumenTouch) el.appendChild(window.LumenTouch.label());
     return el;
   }
   /* Screens are updated in place: only what really changed is touched, so nothing flickers
@@ -1374,6 +1375,7 @@ details.more { border-top: .5px solid var(--line); }
     // On unless switched off in the settings (no longer tied to Reduce Motion).
     const on = settings().haptics !== false;
     try { if (localStorage.getItem('lumen-haptics') !== (on ? 'on' : 'off')) localStorage.setItem('lumen-haptics', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    if (window.LumenTouch) window.LumenTouch.setEnabled(on);
     return on;
   }
   function setTheme(t) {
@@ -1900,6 +1902,7 @@ details.more { border-top: .5px solid var(--line); }
     if (mode === 'gear') { b.innerHTML = ICON.gear; b.setAttribute('aria-label', 'Einstellungen'); }
     else if (mode === 'person') { b.innerHTML = ICON.person; b.setAttribute('aria-label', 'Du: Statistik und Einstellungen'); }
     else if (mode !== 'none') { b.textContent = initial; b.setAttribute('aria-label', 'Du: Statistik und Einstellungen'); }
+    if (window.LumenTouch) window.LumenTouch.equip(b.parentNode);
   }
   function stateCard() {
     if (S.phase === 'signin') { $('viewTitle').textContent = ''; $('statusLine').textContent = ''; return authCard(); }
@@ -2901,7 +2904,7 @@ details.more { border-top: .5px solid var(--line); }
   /* A light tick on every tap of a button, chip, switch or link-button. */
   document.addEventListener('click', function (e) {
     const t = e.target && e.target.closest ? e.target.closest('button, a.btn, [role="button"], input[type="checkbox"], input[type="radio"], select') : null;
-    if (!t || t.disabled || t.closest('.haptic')) return;
+    if (!t || t.disabled || t.closest('.haptic, .hx')) return;
     tick('single');
   }, true);
   /* Swipe left or right on the page to move between Heute, Üben and Archiv. */
@@ -2960,6 +2963,7 @@ details.more { border-top: .5px solid var(--line); }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) clock(); });
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+  if (window.LumenTouch) window.LumenTouch.equip(document);
   boot();
 })();
 </script>
