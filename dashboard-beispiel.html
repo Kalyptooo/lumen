@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Lumen-Karte</title>
+<style>
+:root { --bg: #f2f2f7; --surface: #fff; --surface-2: #e9e9ee; --text: #000; --muted: #6c6c70; --line: rgba(60, 60, 67, .18); --brand: #ff7a00; --warn: #c93400; --alert: #d70015; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #000; --surface: #1c1c1e; --surface-2: #2c2c2e; --text: #fff; --muted: #98989f; --line: rgba(84, 84, 88, .55); --brand: #ff9f0a; --warn: #ffb340; --alert: #ff6961; } }
+* { box-sizing: border-box; }
+body { margin: 0; padding: max(16px, env(safe-area-inset-top)) 16px 32px; background: var(--bg); color: var(--text); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.wrap { max-width: 30rem; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.intro { color: var(--muted); font-size: .875rem; margin: 0 4px; }
+.card { background: var(--surface); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.head { display: flex; align-items: center; gap: 12px; }
+.head img { width: 40px; height: 40px; border-radius: 10px; }
+.head h1 { font-size: 1.25rem; margin: 0; flex: 1; }
+.head small { display: block; color: var(--muted); font-size: .8125rem; font-weight: 500; }
+a { color: var(--brand); text-decoration: none; font-weight: 600; }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kpi { background: var(--surface-2); border-radius: 14px; padding: 10px; min-width: 0; }
+.kpi b { display: block; font-size: 1.375rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi span { color: var(--muted); font-size: .75rem; }
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 48px; }
+.bars i { flex: 1; background: var(--brand); border-radius: 3px 3px 1px 1px; min-height: 2px; opacity: .85; }
+.label { color: var(--muted); font-size: .8125rem; font-weight: 600; margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+li { display: flex; justify-content: space-between; gap: 10px; font-size: .9375rem; }
+li.warn::before, li.alert::before, li.info::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 8px; background: var(--muted); }
+li.warn::before { background: var(--warn); } li.alert::before { background: var(--alert); }
+li span { flex: 1; }
+input, textarea { width: 100%; font: inherit; color: inherit; background: var(--surface-2); border: 0; border-radius: 12px; padding: 10px 12px; }
+textarea { min-height: 70px; resize: vertical; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+button { font: inherit; font-weight: 650; border: 0; border-radius: 999px; padding: 10px 16px; background: var(--brand); color: #000; cursor: pointer; }
+button.quiet { background: var(--surface-2); color: var(--text); }
+button:disabled { opacity: .5; }
+.msg { font-size: .875rem; color: var(--muted); margin: 0; }
+.msg.err { color: var(--alert); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="intro">Beispiel, wie ein Dashboard Lumen über <code>lumen-connect.js</code> einbindet. Daten und Aktionen kommen direkt aus Lumen.</p>
+  <div class="card" id="card"><p class="msg">Lädt …</p></div>
+</div>
+<!-- Locally the preview swaps this line for a fake database; online it only loads the project settings. -->
+<script src="firebase-config.js"></script>
+<script src="lumen-connect.js"></script>
+<script>
+(async function () {
+  const card = document.getElementById('card');
+  const h = function (tag, attrs) {
+    const el = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === 'text') el.textContent = attrs[k];
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) el.setAttribute(k, attrs[k]);
+    });
+    for (let i = 2; i < arguments.length; i++) [].concat(arguments[i]).forEach(function (c) { if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  };
+  const show = function () { card.textContent = ''; for (let i = 0; i < arguments.length; i++) if (arguments[i]) card.appendChild(arguments[i]); };
+  let lumen;
+  try { lumen = await LumenConnect.connect(); } catch (e) { show(h('p', { class: 'msg err', text: e.message })); return; }
+  const head = function (sub) {
+    return h('div', { class: 'head' }, h('img', { src: lumen.info.icon, alt: '' }),
+      h('h1', {}, lumen.info.name, h('small', { text: sub || '' })), h('a', { href: lumen.link('overview'), target: '_blank', rel: 'noopener', text: 'Admin ↗' }));
+  };
+  const form = function (title, fields, label, go) {
+    const msg = h('p', { class: 'msg' });
+    const inputs = fields.map(function (f) { return h('input', { type: f[1], placeholder: f[0], autocomplete: f[2] }); });
+    const b = h('button', { type: 'button', text: label, onclick: async function () {
+      b.disabled = true; msg.className = 'msg'; msg.textContent = '';
+      try { await go.apply(null, inputs.map(function (i) { return i.value; })); draw(); }
+      catch (e) { msg.className = 'msg err'; msg.textContent = e.message; b.disabled = false; }
+    } });
+    return [h('p', { class: 'label', text: title })].concat(inputs, [b, msg]);
+  };
+  const action = function (id, el, after) {
+    const a = lumen.actions.filter(function (x) { return x.id === id; })[0];
+    const msg = h('p', { class: 'msg' });
+    const b = h('button', { type: 'button', class: el ? null : 'quiet', text: a.label, onclick: async function () {
+      if (a.confirm && !confirm(a.label + '?')) return;
+      b.disabled = true;
+      try { msg.className = 'msg'; msg.textContent = await lumen.run(id, el && el.value); if (el) el.value = ''; if (after) after(); }
+      catch (e) { msg.className = 'msg err'; msg.textContent = e.message; }
+      b.disabled = false;
+    } });
+    return { button: b, msg: msg };
+  };
+  async function draw() {
+    const st = await lumen.state();
+    if (!st.signedIn || !st.admin && !st.fresh) {
+      if (st.signedIn) {
+        show.apply(null, [head('Anmeldung bestätigen')].concat(form('Zum Schutz alle 12 Stunden das Passwort', [['Passwort', 'password', 'current-password']], 'Bestätigen', lumen.reauth)));
+        return;
+      }
+      show.apply(null, [head('Admin-Anmeldung')].concat(form('Mit dem Lumen-Admin-Konto anmelden',
+        [['E-Mail', 'email', 'username'], ['Passwort', 'password', 'current-password']], 'Anmelden', lumen.signIn)));
+      return;
+    }
+    if (!st.admin) { show(head('Kein Admin-Zugang'), h('p', { class: 'msg', text: st.email + ' ist kein Admin.' }), h('button', { type: 'button', class: 'quiet', text: 'Abmelden', onclick: function () { lumen.signOut().then(draw); } })); return; }
+    show(head('Lädt …'));
+    let s;
+    try { s = await lumen.summary(); } catch (e) { show(head(''), h('p', { class: 'msg err', text: e.message })); return; }
+    const max = Math.max.apply(null, s.learning.perDay.map(function (d) { return d.active; }).concat([1]));
+    const notice = h('textarea', { maxlength: '400', placeholder: s.notice.text ? 'Aktuell: ' + s.notice.text : 'Mitteilung an alle' });
+    const invite = h('input', { type: 'email', placeholder: 'E-Mail-Adresse(n)' });
+    const refresh = function () { lumen.summary({ force: true }).then(draw); };
+    const n = action('notice', notice, refresh), c = action('clearNotice', null, refresh), inv = action('invite', invite, refresh);
+    show(
+      head('Stand ' + new Date(s.at).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })),
+      h('div', { class: 'kpis' },
+        [[s.people.activeToday, 'heute aktiv'], [s.people.active7, 'in 7 Tagen aktiv'], [s.people.unlocked, 'freigeschaltet'],
+          [s.people.reminders, 'mit Erinnerungen'], [s.learning.pct === null ? '–' : s.learning.pct + ' %', 'Trefferquote'],
+          [s.content.daysLeft === null ? '–' : s.content.daysLeft + ' T.', 'Fakten reichen']].map(function (k) {
+          return h('div', { class: 'kpi' }, h('b', { text: String(k[0]) }), h('span', { text: k[1] }));
+        })),
+      h('p', { class: 'label', text: 'Aktive Personen, letzte 14 Tage' }),
+      h('div', { class: 'bars', role: 'img', 'aria-label': 'Aktive Personen pro Tag' }, s.learning.perDay.map(function (d) {
+        return h('i', { title: d.date + ': ' + d.active, style: 'height:' + Math.round(100 * d.active / max) + '%' });
+      })),
+      s.attention.length ? h('ul', {}, s.attention.map(function (a) {
+        return h('li', { class: a.level }, h('span', { text: a.text }), h('a', { href: a.link, target: '_blank', rel: 'noopener', text: 'Öffnen' }));
+      })) : h('p', { class: 'msg', text: 'Nichts zu tun. Alles läuft.' }),
+      h('p', { class: 'label', text: 'Mitteilung an alle' }), notice, h('div', { class: 'row' }, n.button, s.notice.text ? c.button : null), n.msg, c.msg,
+      h('p', { class: 'label', text: 'Personen freischalten' }), invite, h('div', { class: 'row' }, inv.button), inv.msg,
+      h('div', { class: 'row' }, h('a', { href: lumen.link('people'), target: '_blank', rel: 'noopener', text: 'Personen verwalten ↗' }),
+        h('a', { href: lumen.link('facts'), target: '_blank', rel: 'noopener', text: 'Fakten bearbeiten ↗' }),
+        h('button', { type: 'button', class: 'quiet', text: 'Aktualisieren', onclick: refresh }))
+    );
+  }
+  lumen.onChange(draw);
+})();
+</script>
+</body>
+</html>

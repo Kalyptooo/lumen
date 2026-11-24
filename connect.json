@@ -1,0 +1,12 @@
+{
+  "contract": 1,
+  "id": "lumen",
+  "name": "Lumen",
+  "description": "Allgemeinwissen: jeden Tag ein paar Fakten, Quiz und Auffrischung.",
+  "icon": "icon-180.png",
+  "app": "./",
+  "admin": "admin.html",
+  "script": "lumen-connect.js",
+  "global": "LumenConnect",
+  "docs": "CONNECT.md"
+}

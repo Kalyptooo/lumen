@@ -399,7 +399,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     const open = allReports().filter(function (r) { return !handled(r); }).length;
     root.appendChild(h('div', { class: 'tabs', role: 'group', 'aria-label': 'Bereich' },
       TABS.map(function (t) {
-        return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; render(); } });
+        return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; setHash(); render(); } });
       })));
     const view = { overview: overview, people: people, settings: forAll, facts: facts, reports: reports, weekly: weekly }[S.tab];
     add(root, view());
@@ -797,6 +797,17 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     ];
   }
 
+  /* Deep links from the dashboard connector: admin.html#people/<uid>, #reports, #weekly … */
+  function fromHash() {
+    const m = /^#([a-z]+)(?:\/(.+))?$/.exec(location.hash || '');
+    if (!m || !TABS.some(function (t) { return t[0] === m[1]; })) return false;
+    S.tab = m[1];
+    if (m[1] === 'people' && m[2]) S.sel = decodeURIComponent(m[2]);
+    return true;
+  }
+  function setHash() { try { history.replaceState(null, '', '#' + S.tab); } catch (e) { /* ignore */ } }
+  fromHash();
+  window.addEventListener('hashchange', function () { if (fromHash()) render(); });
   boot();
 })();
 </script>
