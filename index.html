@@ -359,8 +359,6 @@ details.more summary::after { content: '+'; color: var(--muted); font-size: 1.25
 details.more[open] summary::after { content: '–'; }
 details.more > div { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
 @media (prefers-reduced-motion: no-preference) {
-  .view article[data-key] { animation: enter .2s ease-out; }
-  @keyframes enter { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .option, .btn, .seg-item, .choice, .lineitem { transition: background-color .15s, border-color .15s, transform .1s; }
   .btn:active, .choice:active, .option:active { transform: scale(.985); }
 }
@@ -454,13 +452,117 @@ details.more { border-top: .5px solid var(--line); }
 .switchrow input[type="checkbox"] { border: 0; background-color: var(--surface-2); background-image: radial-gradient(circle at 16px 50%, #ffffff 0 13px, transparent 13.5px); }
 .switchrow input[type="checkbox"]:checked { background-color: #34c759; background-image: radial-gradient(circle at calc(100% - 16px) 50%, #ffffff 0 13px, transparent 13.5px); }
 @media (max-width: 350px) { .sheetbody > .section { padding-inline: 12px; } .brand h1 { font-size: 1.875rem; } }
+
+/* ---------- Du page ---------- */
+.tabs { grid-template-columns: repeat(4, 1fr); width: min(calc(100% - 24px), 25rem); }
+.main { overflow-x: hidden; }
+.backbtn { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; min-height: 32px; margin: -6px 0 0 -8px; padding: 0 8px 0 2px; border: 0; background: transparent; color: var(--brand); font-size: 1.0625rem; font-weight: 500; }
+.backbtn svg { width: 22px; height: 22px; stroke-width: 2.4; }
+.top .iconbtn svg { width: 22px; height: 22px; }
+.youpage { display: flex; flex-direction: column; gap: 14px; }
+.stat { gap: 10px; padding: 18px 20px; }
+.stat .kicker { color: var(--muted); font-size: .8125rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.statbig { display: flex; align-items: baseline; gap: 6px; margin-top: -4px; }
+.statbig b { font-size: 2.25rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.statbig span { color: var(--muted); font-weight: 600; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pair .stat { padding: 16px; }
+.pair .statbig b { font-size: 2rem; }
+.weekbars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; }
+.wb { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.wb em { font-style: normal; font-size: .75rem; font-weight: 650; color: var(--muted); min-height: 1.1em; font-variant-numeric: tabular-nums; }
+.wb .col { display: flex; align-items: flex-end; width: 100%; max-width: 30px; height: 84px; border-radius: 8px; background: var(--surface-2); overflow: hidden; }
+.wb .col i { display: block; width: 100%; border-radius: 8px; background: var(--brand); transform-origin: bottom; }
+.wb small { color: var(--muted); font-size: .75rem; font-weight: 600; }
+.wb.now small { color: var(--brand); font-weight: 800; }
+.wb.later .col { opacity: .45; }
+.membar { display: flex; gap: 3px; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); }
+.membar i { display: block; min-width: 6px; transform-origin: left; }
+.m3 { background: var(--brand); }
+.m2 { background: color-mix(in srgb, var(--brand) 50%, var(--surface-2)); }
+.m1 { background: color-mix(in srgb, var(--muted) 45%, var(--surface-2)); }
+.legend { display: flex; flex-direction: column; gap: 10px; }
+.legendrow { display: flex; gap: 10px; align-items: flex-start; }
+.legendrow > i { flex: none; width: 12px; height: 12px; margin-top: 5px; border-radius: 4px; }
+.legendrow strong { display: flex; gap: 8px; font-weight: 650; }
+.legendrow strong span { margin-left: auto; font-variant-numeric: tabular-nums; }
+.legendrow > div { flex: 1; min-width: 0; }
+.legendrow small { display: block; color: var(--muted); font-size: .8125rem; line-height: 1.35; }
+.tip { background: var(--surface-2); border-radius: 14px; padding: 10px 12px; font-size: .9375rem; }
+.stat .arearow:last-child { border-bottom: 0; }
+.arearow .line span { display: inline-flex; gap: 8px; align-items: baseline; }
+.pct { color: var(--text); font-weight: 700; }
+.pct.good { color: var(--good); }
+.pct.low { color: var(--warn); }
+.navlist { margin-top: 6px; border-radius: 20px; background: var(--surface); overflow: hidden; }
+.navrow { position: relative; width: 100%; min-height: 54px; display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 0; background: transparent; color: var(--text); font-size: 1rem; text-align: left; }
+.navrow + .navrow::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--line); }
+.navrow:active { background: var(--surface-2); }
+.navrow .grow { flex: 1; }
+.navrow small { color: var(--muted); font-size: .9375rem; }
+.navicon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: var(--brand); color: #fff; flex: none; }
+.navicon svg { width: 19px; height: 19px; stroke-width: 2; }
+.chev svg { width: 18px; height: 18px; color: var(--muted); stroke-width: 2.2; }
+#viewYou .section { padding: 14px 16px; border-radius: 20px; background: var(--surface); }
+#viewYou .section > h3, #viewYou .planhead h3 { color: var(--muted); font-size: .8125rem; font-weight: 600; }
+#viewYou .section > .btn.link { align-self: flex-start; }
+.hint.pad { padding-inline: 6px; }
+.friends .friend:last-child { border-bottom: 0; }
+
+/* ---------- Motion: short and light, never in the way. Off with Reduce Motion. ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .view.in-r { animation: in-r .22s cubic-bezier(.2, .8, .2, 1); }
+  .view.in-l { animation: in-l .22s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes in-r { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @keyframes in-l { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+  .youpage.push { animation: push .26s cubic-bezier(.2, .8, .2, 1); }
+  .youpage.pop { animation: pop-back .26s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes push { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
+  @keyframes pop-back { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+  #viewTitle.swap { animation: fade .18s ease-out; }
+  .backbtn:not([hidden]) { animation: fade .2s ease-out; }
+  .tabs button { transition: background-color .2s ease, color .2s ease, transform .12s ease; }
+  .tabs button:active { transform: scale(.93); }
+  .tabs button[aria-current="page"] svg { animation: bump .3s cubic-bezier(.3, 1.5, .5, 1); }
+  @keyframes bump { 0% { transform: scale(.82); } 100% { transform: none; } }
+  .iconbtn, .navrow, .chips button, .seg button, .stepper button, .areaselect, .backbtn { transition: background-color .15s ease, color .15s ease, transform .12s ease, opacity .15s ease; }
+  .iconbtn:active, .stepper button:active, .chips button:active, .seg button:active { transform: scale(.92); }
+  .navrow:active { transform: scale(.985); }
+  .btn:active, .choice:active, .option:active, .seg-item:active, .item:active { transform: scale(.97); }
+  .item, .seg-item { transition: background-color .15s, transform .12s; }
+  .option { transition: background-color .15s, box-shadow .15s, transform .12s; }
+  .option.correct { animation: bump .32s cubic-bezier(.3, 1.5, .5, 1); }
+  .option.chosen { animation: nudge .32s ease-out; }
+  @keyframes nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-5px); } 60% { transform: translateX(4px); } }
+  .feedback { animation: rise-in .22s ease-out; }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .scorebar i { animation: dot .3s cubic-bezier(.3, 1.4, .5, 1) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+  @keyframes dot { from { opacity: 0; transform: scaleX(.2); } to { opacity: 1; transform: none; } }
+  .bar i, .membar i { animation: grow-x .55s cubic-bezier(.2, .8, .2, 1) backwards; transition: width .3s ease, flex-grow .3s ease; transform-origin: left; }
+  @keyframes grow-x { from { transform: scaleX(0); } to { transform: none; } }
+  .wb .col i { animation: grow-y .5s cubic-bezier(.2, .8, .2, 1) backwards; transition: height .3s ease; }
+  .wb:nth-child(2) .col i { animation-delay: 30ms; } .wb:nth-child(3) .col i { animation-delay: 60ms; } .wb:nth-child(4) .col i { animation-delay: 90ms; }
+  .wb:nth-child(5) .col i { animation-delay: 120ms; } .wb:nth-child(6) .col i { animation-delay: 150ms; } .wb:nth-child(7) .col i { animation-delay: 180ms; }
+  @keyframes grow-y { from { transform: scaleY(0); } to { transform: none; } }
+  .cal i { transition: background-color .2s; }
+  .cal i.on { animation: fade .3s ease-out backwards; }
+  .progress i { transition: width .3s cubic-bezier(.2, .8, .2, 1); }
+  .toast:not([hidden]) { animation: toast-in .24s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0); } }
+  .toast.swap:not([hidden]) { animation: fade .18s ease-out; }
+  .sheet.leaving { transition: transform .2s ease-in; transform: translateY(100%) !important; animation: none; }
+  .scrim.leaving { transition: opacity .2s ease-in; opacity: 0; animation: none; }
+  .switchrow input[type="checkbox"] { transition: background-color .2s, background-position .2s; }
+  .view article[data-key] { animation: enter .24s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}
 </style>
 </head>
 <body>
 <div class="app" id="app">
   <header class="top">
-    <div class="brand"><h1 id="viewTitle">Heute</h1><p class="status" id="statusLine" aria-live="polite"></p></div>
-    <button class="iconbtn" id="btnProgress" type="button" aria-label="Fortschritt und Einstellungen öffnen">
+    <div class="brand"><button class="backbtn" id="btnBack" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Du</span></button><h1 id="viewTitle">Heute</h1><p class="status" id="statusLine" aria-live="polite"></p></div>
+    <button class="iconbtn" id="btnProgress" type="button" aria-label="Du: Statistik und Einstellungen">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
     </button>
   </header>
@@ -475,6 +577,7 @@ details.more { border-top: .5px solid var(--line); }
       <div class="chips" id="archiveChips" role="group" aria-label="Filter"></div>
       <div id="archiveList"></div>
     </section>
+    <section class="view" id="viewYou" aria-label="Du" hidden></section>
   </main>
   <nav class="tabs" aria-label="Hauptnavigation">
     <button type="button" data-tab="today" aria-current="page">
@@ -488,6 +591,10 @@ details.more { border-top: .5px solid var(--line); }
     <button type="button" data-tab="archive">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4ZM4 12l8 4 8-4M4 17l8 4 8-4"/></svg>
       <span>Archiv</span>
+    </button>
+    <button type="button" data-tab="you">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>
+      <span>Du</span>
     </button>
   </nav>
 </div>
@@ -869,6 +976,52 @@ details.more { border-top: .5px solid var(--line); }
     while (dayCounts(d[cur])) { n += 1; cur = addDays(cur, -1); }
     return n;
   }
+  function mondayOf(dateStr) { return addDays(dateStr, -((weekdayOf(dateStr) + 6) % 7)); }
+  function bestStreak(days) {
+    const list = Object.keys(days || {}).filter(function (d) { return isDateStr(d) && dayCounts(days[d]); }).sort();
+    let best = 0, run = 0, prev = null;
+    list.forEach(function (d) { run = prev && diffDays(d, prev) === 1 ? run + 1 : 1; prev = d; if (run > best) best = run; });
+    return best;
+  }
+  /* Everything the Du page shows, from the learning state alone. */
+  function youStats(states, days, stats, today) {
+    const s = states || {}, dd = days || {};
+    const monday = mondayOf(today), lastMonday = addDays(monday, -7);
+    const week = [0, 0, 0, 0, 0, 0, 0], mem = { neu: 0, festigen: 0, sicher: 0 };
+    let lastWeek = 0, known = 0, learned = 0;
+    Object.keys(s).forEach(function (id) {
+      const st = s[id];
+      if (isKnown(st)) { known += 1; return; }
+      if (!isSeen(st)) return;
+      learned += 1;
+      const d = dateOfISO(st.seenAt);
+      if (d && d >= monday && d <= today) week[diffDays(d, monday)] += 1;
+      else if (d && d >= lastMonday && d < monday) lastWeek += 1;
+      const box = st.box || 0;
+      if (box >= 3) mem.sicher += 1; else if (box >= 1) mem.festigen += 1; else mem.neu += 1;
+    });
+    const active = week.map(function (n, i) { const d = addDays(monday, i); return d <= today && (dayCounts(dd[d]) || n > 0); });
+    const areas = areaStats(s, stats), recentAreas = (stats && stats.areas) || {};
+    let right = 0, answered = 0;
+    AREAS.forEach(function (a) {
+      const recent = (recentAreas[a.key] && Array.isArray(recentAreas[a.key].recent)) ? recentAreas[a.key].recent : [];
+      recent.forEach(function (v) { answered += 1; right += v ? 1 : 0; });
+    });
+    const ranked = AREAS.filter(function (a) { return areas[a.key].answered >= 5; })
+      .sort(function (a, b) { return areas[b.key].pct - areas[a.key].pct; });
+    const top = ranked[0], low = ranked[ranked.length - 1];
+    const cur = streak(dd, today);
+    return {
+      monday: monday, week: week, weekTotal: week.reduce(function (n, v) { return n + v; }, 0), lastWeek: lastWeek,
+      active: active, activeDays: active.filter(Boolean).length,
+      streak: cur, best: Math.max(cur, bestStreak(dd)),
+      learned: learned, known: known, mem: mem,
+      answered: answered, pct: answered ? Math.round(100 * right / answered) : null,
+      areas: areas,
+      strongest: top ? top.key : null,
+      weakest: low && ranked.length >= 2 && areas[low.key].pct < 75 && areas[low.key].pct < areas[top.key].pct ? low.key : null
+    };
+  }
   function learnedCount(states) {
     return Object.keys(states || {}).filter(function (id) { return isSeen(states[id]) && !isKnown(states[id]); }).length;
   }
@@ -1070,7 +1223,7 @@ details.more { border-top: .5px solid var(--line); }
     selectVortag: selectVortag, selectDaily: selectDaily, quizFor: quizFor, selectRefresh: selectRefresh, quizBudget: quizBudget, selectCatchup: selectCatchup,
     randomWeight: randomWeight, randomOrder: randomOrder,
     blockUnlocked: blockUnlocked, todayModel: todayModel, nextStep: nextStep, isReleased: isReleased,
-    dayCounts: dayCounts, streak: streak, learnedCount: learnedCount, statusLine: statusLine,
+    dayCounts: dayCounts, streak: streak, bestStreak: bestStreak, mondayOf: mondayOf, youStats: youStats, learnedCount: learnedCount, statusLine: statusLine,
     pushRecent: pushRecent, areaStats: areaStats, knownIds: knownIds, normalizeWeights: normalizeWeights,
     buildDigest: buildDigest, sameDigest: sameDigest,
     pickNews: pickNews, newsLine: newsLine, safeUrl: safeUrl,
@@ -1098,6 +1251,10 @@ details.more { border-top: .5px solid var(--line); }
     close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
     ask: svg('<path d="M5 18.5V6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9z"/><path d="M10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9M12 13.6v.1"/>'),
     next: svg('<path d="m9 6 6 6-6 6"/>'),
+    gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+    people: svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/>'),
+    sliders: svg('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
+    person: svg('<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>'),
     morgen: svg(arc + '<circle cx="11.5" cy="21.5" r="3.4" fill="currentColor"/>', 'glyph', '40 40'),
     mittag: svg(arc + '<circle cx="20" cy="18" r="3.4" fill="currentColor"/>', 'glyph', '40 40'),
     abend: svg(arc + '<circle cx="28.5" cy="21.5" r="3.4" fill="currentColor"/>', 'glyph', '40 40')
@@ -1133,7 +1290,7 @@ details.more { border-top: .5px solid var(--line); }
     news: [], newsAt: 0, digest: null, digestLoaded: false, lists: { reports: [], research: [] }, answers: {}, handledUntil: null,
     flow: null, pflow: null, later: {}, pick: null, busy: false, randomSeen: {},
     archive: { query: '', filter: 'all', days: {}, loading: false, failed: false, idx: null, hits: [], cap: 120 },
-    askOff: false, sheets: [], lastFacts: undefined
+    askOff: false, sheets: [], lastFacts: undefined, youPage: null, youMove: ''
   };
 
   /* ---------- small helpers ---------- */
@@ -1226,6 +1383,7 @@ details.more { border-top: .5px solid var(--line); }
     const dark = t === 'black' || t === 'dark' || ((!t || t === 'auto') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.setAttribute('content', t === 'black' ? '#000000' : (dark ? '#000000' : '#f2f2f7')); });
     S.sheets.forEach(function (sh) { if (sh.draw) sh.draw(); });
+    scheduleRender();
   }
   const tick = L.makeTick({
     isEnabled: hapticsOn,
@@ -1237,6 +1395,7 @@ details.more { border-top: .5px solid var(--line); }
   function toast(msg) {
     const el = $('toast');
     el.textContent = msg;
+    if (el.hidden) el.classList.remove('swap'); else slideIn(el, 'swap');
     el.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.hidden = true; }, 3800);
@@ -1676,7 +1835,7 @@ details.more { border-top: .5px solid var(--line); }
     raf = setTimeout(function () { raf = 0; render(); }, 16);
   }
   function render() {
-    const titles = { today: 'Heute', practice: 'Üben', archive: 'Archiv' };
+    const titles = { today: 'Heute', practice: 'Üben', archive: 'Archiv', you: 'Du' };
     let line = '';
     if (S.phase === 'ready') {
       if (S.tab === 'today') {
@@ -1685,28 +1844,62 @@ details.more { border-top: .5px solid var(--line); }
       } else if (S.tab === 'practice') {
         const due = refreshIds().length;
         line = L.learnedCount(S.ls.states) + ' Fakten gelernt' + (due ? ' · ' + due + ' fällig' : '');
-      } else line = 'Alles, was du schon gelesen hast';
+      } else if (S.tab === 'archive') line = 'Alles, was du schon gelesen hast';
+      else if (!S.youPage) {
+        const learned = L.learnedCount(S.ls.states);
+        line = (firstName() ? firstName() + ' · ' : '') + learned + (learned === 1 ? ' Fakt gelernt' : ' Fakten gelernt');
+      }
       if (S.stale) line += ' · offline';
     }
     if (S.phase === 'ready') forgetReplaced();
-    $('viewTitle').textContent = titles[S.tab] || 'Lumen';
+    const sub = S.tab === 'you' && S.youPage && S.phase === 'ready';
+    setTitle(sub ? YOU_PAGES[S.youPage] : (titles[S.tab] || 'Lumen'));
+    $('btnBack').hidden = !sub;
     $('statusLine').textContent = line;
     const outside = S.phase === 'signin' || S.phase === 'verify' || S.phase === 'denied';
     document.querySelector('.tabs').hidden = outside;
-    $('btnProgress').hidden = S.phase !== 'ready';
-    const initial = firstName().charAt(0).toUpperCase();
-    if (initial && $('btnProgress').textContent !== initial) $('btnProgress').textContent = initial;
+    headerButton(sub);
     if (outside) S.tab = 'today';
-    [['today', 'viewToday'], ['practice', 'viewPractice'], ['archive', 'viewArchive']].forEach(function (pair) {
-      $(pair[1]).hidden = S.tab !== pair[0];
+    const before = VIEWS.filter(function (p) { return !$(p[1]).hidden; })[0];
+    VIEWS.forEach(function (pair, i) {
+      const el = $(pair[1]), show = S.tab === pair[0];
+      if (show && el.hidden && before && S.phase === 'ready') slideIn(el, i > VIEWS.indexOf(before) ? 'in-r' : 'in-l');
+      el.hidden = !show;
     });
     document.querySelectorAll('.tabs button').forEach(function (b) {
       if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     });
     if (S.tab === 'today') renderToday();
     else if (S.tab === 'practice') renderPractice();
-    else renderArchive();
+    else if (S.tab === 'archive') renderArchive();
+    else renderYou();
     S.sheets.forEach(function (s) { if (s.live && !typingIn(s)) s.draw(); });
+  }
+  const VIEWS = [['today', 'viewToday'], ['practice', 'viewPractice'], ['archive', 'viewArchive'], ['you', 'viewYou']];
+  const motion = function () { return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); };
+  /* Restart a short CSS animation on an element that stays in place. */
+  function slideIn(el, cls) {
+    if (!motion()) return;
+    el.classList.remove('in-r', 'in-l', 'swap');
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  function setTitle(text) {
+    const el = $('viewTitle');
+    if (el.textContent === text) return;
+    el.textContent = text;
+    if (S.phase === 'ready') slideIn(el, 'swap');
+  }
+  /* Top right: your initial on the other tabs (opens Du), a gear on Du (opens Einstellungen), nothing on a sub-page. */
+  function headerButton(sub) {
+    const b = $('btnProgress'), initial = firstName().charAt(0).toUpperCase();
+    const mode = S.phase !== 'ready' || sub ? 'none' : (S.tab === 'you' ? 'gear' : (initial ? 'i:' + initial : 'person'));
+    b.hidden = mode === 'none';
+    if (b.dataset.mode === mode) return;
+    b.dataset.mode = mode;
+    if (mode === 'gear') { b.innerHTML = ICON.gear; b.setAttribute('aria-label', 'Einstellungen'); }
+    else if (mode === 'person') { b.innerHTML = ICON.person; b.setAttribute('aria-label', 'Du: Statistik und Einstellungen'); }
+    else if (mode !== 'none') { b.textContent = initial; b.setAttribute('aria-label', 'Du: Statistik und Einstellungen'); }
   }
   function stateCard() {
     if (S.phase === 'signin') { $('viewTitle').textContent = ''; $('statusLine').textContent = ''; return authCard(); }
@@ -2001,7 +2194,7 @@ details.more { border-top: .5px solid var(--line); }
     return [
       h('p', { class: 'label', text: QUIZ_TITLE[flow.kind] }),
       h('article', { class: 'card', 'data-key': 'summary' }, h('p', { class: 'big', text: right + ' von ' + n + ' richtig' }),
-        h('div', { class: 'scorebar', role: 'presentation' }, flow.results.map(function (ok) { return h('i', { class: ok ? 'ok' : 'no' }); })),
+        h('div', { class: 'scorebar', role: 'presentation' }, flow.results.map(function (ok, i) { return h('i', { class: ok ? 'ok' : 'no', style: '--i:' + i }); })),
         h('p', { class: 'lead', text: right === n ? 'Alles gewusst.' : 'Was noch nicht saß, kommt morgen wieder dran.' }),
         missed.length ? h('div', { class: 'missed' }, h('p', { class: 'fieldlabel', text: 'Noch einmal ansehen' }), missed.map(function (f) {
           return h('button', { class: 'item', type: 'button', onclick: function () { openDetail(f.id); } },
@@ -2172,8 +2365,12 @@ details.more { border-top: .5px solid var(--line); }
     const i = S.sheets.indexOf(sheet);
     if (i === -1) return;
     S.sheets.splice(i, 1);
-    sheet.scrim.remove();
-    sheet.panel.remove();
+    const scrim = sheet.scrim, panel = sheet.panel;
+    if (motion()) {
+      panel.classList.add('leaving');
+      scrim.classList.add('leaving');
+      setTimeout(function () { scrim.remove(); panel.remove(); }, 200);
+    } else { scrim.remove(); panel.remove(); }
     if (sheet.onclose) sheet.onclose();
     try { if (sheet.opener && document.contains(sheet.opener)) sheet.opener.focus(); } catch (e) { /* ignore */ }
   }
@@ -2338,13 +2535,13 @@ details.more { border-top: .5px solid var(--line); }
     redraw();
   }
   function pushRow(t) {
-    const redraw = function () { S.sheets.forEach(function (sh) { sh.draw(); }); };
+    const redraw = function () { render(); };
     const on = settings().push === true;
     return h('div', { class: 'switchrow' }, h('span', {}, 'Erinnerungen', h('small', { class: 'hint', style: 'display:block', text: on ? L.BLOCKS.filter(function (b) { return planCfg().counts[b] > 0; }).map(function (b) { return t[b]; }).join(', ') + ' Uhr' : (standalone() ? 'zu den Etappen, wenn noch etwas offen ist' : 'nur vom Home-Bildschirm aus') })),
       h('input', { id: 'pushToggle', type: 'checkbox', role: 'switch', checked: on, disabled: pushBusy || (!on && !standalone()), onchange: function (e) { if (e.target.checked) enablePush(redraw); else disablePush(redraw); } }));
   }
   function pushSection(t) {
-    const redraw = function () { S.sheets.forEach(function (sh) { sh.draw(); }); };
+    const redraw = function () { render(); };
     const on = settings().push === true;
     return h('div', { class: 'section' }, h('h3', { text: 'Erinnerungen' }),
       h('p', { class: 'hint', text: on
@@ -2467,124 +2664,188 @@ details.more { border-top: .5px solid var(--line); }
 
   /* ---------- Fortschritt und Einstellungen ---------- */
 
-  function openProgress() {
-    let seg = 'progress', accountOpen = false;
-    const sheet = openSheet('Fortschritt und Einstellungen', function () {
-      const tabs = h('div', { class: 'seg', role: 'group', 'aria-label': 'Bereich wählen' },
-        [['progress', 'Fortschritt'], ['friends', 'Freunde'], ['settings', 'Einstellungen']].map(function (t) {
-          return h('button', { type: 'button', text: t[1], 'aria-pressed': String(seg === t[0]), onclick: function () { seg = t[0]; sheet.draw(); sheet.body.scrollTop = 0; } });
-        }));
-      return [tabs, seg === 'progress' ? progressView() : (seg === 'friends' ? friendsView(function () { sheet.draw(); }) : settingsView())];
-    });
-    function areaRow(a, stats, max) {
-      const s = stats[a.key];
-      return h('div', { class: 'arearow' },
-        h('div', { class: 'line' }, h('strong', {}, areaDot(a.key), a.name),
-          h('span', { text: s.read + ' gelesen' + (s.pct === null ? '' : ' · ' + s.pct + ' % richtig') })),
-        h('div', { class: 'bar', role: 'presentation' }, h('i', { style: 'width:' + Math.round(100 * s.read / max) + '%' })));
+  /* ---------- Du: statistics on top, then friends, settings and account as full pages ---------- */
+
+  const YOU_PAGES = { friends: 'Freunde', settings: 'Einstellungen', account: 'Konto und Daten' };
+  function openYou(page) {
+    const from = S.tab === 'you' ? S.youPage : undefined;
+    S.youMove = from === undefined ? '' : (page ? 'push' : (from ? 'pop' : ''));
+    if (S.tab !== 'you' || page !== from) { S.tab = 'you'; S.youPage = page || null; render(); scrollTop(); }
+  }
+  function renderYou() { if (S.phase === 'ready') paint($('viewYou'), buildYou); }
+  function buildYou(root) {
+    const redraw = function () { render(); };
+    const page = S.youPage;
+    let content;
+    if (page === 'friends') content = friendsView(redraw);
+    else if (page === 'settings') content = settingsView();
+    else if (page === 'account') content = accountView();
+    else content = statsView().concat([youMenu()]);
+    append(root, h('div', { class: 'youpage' + (S.youMove ? ' ' + S.youMove : ''), 'data-key': 'you-' + (page || 'root') + '-' + S.youMove }, content));
+  }
+  function youMenu() {
+    const row = function (page, label, value, icon) {
+      return h('button', { class: 'navrow', type: 'button', onclick: function () { openYou(page); } },
+        h('span', { class: 'navicon', html: icon }), h('span', { class: 'grow', text: label }), value ? h('small', { text: value }) : null, h('span', { class: 'chev', html: ICON.next }));
+    };
+    return h('div', { class: 'navlist' },
+      row('friends', 'Freunde', settings().friends === true ? 'An' : 'Aus', ICON.people),
+      row('settings', 'Einstellungen', '', ICON.sliders),
+      row('account', 'Konto und Daten', '', ICON.person));
+  }
+  function statCard(key, kicker, number, unit, extra) {
+    return h('section', { class: 'card stat', 'data-key': key }, h('p', { class: 'kicker', text: kicker }),
+      h('p', { class: 'statbig' }, h('b', { text: number }), unit ? h('span', { text: unit }) : null), extra);
+  }
+  function statsView() {
+    const t = today(), y = L.youStats(S.ls.states, S.ls.days, S.priv.stats, t);
+    const plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
+    const out = [];
+
+    const max = Math.max.apply(null, y.week.concat([1]));
+    const diff = y.weekTotal - y.lastWeek;
+    const cmp = !y.lastWeek ? '' : (diff > 0 ? diff + ' mehr als letzte Woche' : (diff < 0 ? -diff + ' weniger als letzte Woche' : 'so viele wie letzte Woche'));
+    out.push(statCard('st-week', 'Diese Woche', String(y.weekTotal), y.weekTotal === 1 ? 'Fakt gelernt' : 'Fakten gelernt', [
+      h('p', { class: 'hint', text: 'An ' + y.activeDays + ' von 7 Tagen gelernt' + (cmp ? ' · ' + cmp : '') }),
+      h('div', { class: 'weekbars', role: 'img', 'aria-label': 'Fakten pro Tag diese Woche: ' + y.week.join(', ') }, y.week.map(function (n, i) {
+        const d = L.addDays(y.monday, i);
+        return h('div', { class: 'wb' + (d === t ? ' now' : '') + (d > t ? ' later' : '') + (y.active[i] ? ' on' : '') },
+          h('em', { text: n ? String(n) : '' }),
+          h('span', { class: 'col' }, h('i', { style: 'height:' + (n ? Math.max(10, Math.round(100 * n / max)) : (y.active[i] ? 6 : 0)) + '%' })),
+          h('small', { text: 'MDMDFSS'.charAt(i) }));
+      }))
+    ]));
+
+    const streakNote = !y.streak ? (y.best ? 'Rekord: ' + plural(y.best, 'Tag', 'Tage') : 'Lern heute, dann beginnt sie.') : (y.streak >= y.best && y.streak > 1 ? 'So lang wie noch nie' : 'Rekord: ' + plural(y.best, 'Tag', 'Tage'));
+    out.push(h('div', { class: 'pair', 'data-key': 'st-pair' },
+      statCard('st-streak', 'Serie', String(y.streak), y.streak === 1 ? 'Tag' : 'Tage', h('p', { class: 'hint', text: streakNote })),
+      statCard('st-pct', 'Trefferquote', y.pct === null ? '–' : String(y.pct), y.pct === null ? '' : '%',
+        h('p', { class: 'hint', text: y.answered ? 'Deine letzten ' + y.answered + ' Antworten' : 'Noch keine Antworten' }))));
+
+    const due = refreshIds().length, m = y.mem;
+    const seg = function (n, cls) { return n ? h('i', { class: cls, style: 'flex-grow:' + n }) : null; };
+    const legend = function (cls, label, n, text) {
+      return h('div', { class: 'legendrow' }, h('i', { class: cls }), h('div', {}, h('strong', {}, label, h('span', { text: String(n) })), h('small', { text: text })));
+    };
+    out.push(statCard('st-mem', 'Dein Wissen', String(y.learned), y.learned === 1 ? 'Fakt gelernt' : 'Fakten gelernt', [
+      y.learned ? h('div', { class: 'membar', role: 'presentation' }, seg(m.sicher, 'm3'), seg(m.festigen, 'm2'), seg(m.neu, 'm1')) : null,
+      h('div', { class: 'legend' },
+        legend('m3', 'Sicher', m.sicher, 'Mehrmals richtig, kommt erst in Wochen wieder.'),
+        legend('m2', 'Am Festigen', m.festigen, 'Schon gewusst, wird noch ein paar Mal wiederholt.'),
+        legend('m1', 'Neu', m.neu, 'Gelesen oder zuletzt falsch, kommt bald wieder.')),
+      due ? btn(due === 1 ? '1 fälligen Fakt auffrischen' : due + ' fällige Fakten auffrischen', 'primary', function () { S.tab = 'practice'; startQuiz('refresh', 'pflow'); scrollTop(); }, S.busy)
+        : h('p', { class: 'hint', text: y.learned ? 'Gerade ist nichts fällig.' : 'Sobald du Fakten liest, siehst du hier, wie gut sie sitzen.' }),
+      y.known ? h('p', { class: 'hint', text: plural(y.known, 'Fakt kanntest', 'Fakten kanntest') + ' du schon vorher. Die zählen nicht mit.' }) : null
+    ]));
+
+    const rows = L.AREAS.filter(function (a) { return y.areas[a.key].read > 0 || y.areas[a.key].answered > 0; })
+      .sort(function (a, b) { return y.areas[b.key].read - y.areas[a.key].read; });
+    const maxRead = Math.max.apply(null, rows.map(function (a) { return y.areas[a.key].read; }).concat([1]));
+    const short = function (k) { return L.AREA_BY_KEY[k].short; };
+    let tip = '';
+    if (y.strongest) tip = 'Am besten bist du bei ' + short(y.strongest) + ' (' + y.areas[y.strongest].pct + ' %).';
+    if (y.weakest) tip += ' Üben lohnt sich bei ' + short(y.weakest) + ' (' + y.areas[y.weakest].pct + ' %).';
+    out.push(h('section', { class: 'card stat', 'data-key': 'st-areas' }, h('p', { class: 'kicker', text: 'Bereiche' }),
+      rows.length ? [
+        tip ? h('p', { class: 'tip', text: tip.trim() }) : null,
+        h('div', {}, rows.map(function (a) {
+          const st = y.areas[a.key], pct = st.pct;
+          return h('div', { class: 'arearow' },
+            h('div', { class: 'line' }, h('strong', {}, areaDot(a.key), a.short),
+              h('span', {}, plural(st.read, 'Fakt', 'Fakten'), pct === null ? null : h('b', { class: 'pct' + (pct >= 80 ? ' good' : (pct < 60 ? ' low' : '')), text: pct + ' %' }))),
+            h('div', { class: 'bar', role: 'presentation' }, h('i', { style: 'width:' + Math.max(4, Math.round(100 * st.read / maxRead)) + '%' })));
+        })),
+        h('p', { class: 'hint', text: 'Balken: gelesene Fakten. Prozent: richtige Antworten zuletzt.' })
+      ] : h('p', { class: 'hint', text: 'Hier siehst du bald, aus welchen Bereichen du am meisten weißt.' })));
+
+    const monday = y.monday, start = L.addDays(monday, -28), cells = [];
+    let days = 0;
+    for (let i = 0; i < 35; i += 1) {
+      const d = L.addDays(start, i), on = !!(S.ls.days[d] && L.dayCounts(S.ls.days[d]));
+      if (on && d <= t) days += 1;
+      cells.push(h('i', { class: (on ? 'on' : '') + (d === t ? ' now' : '') + (d > t ? ' later' : ''), title: L.formatDay(d) }));
     }
-    function progressView() {
-      const stats = L.areaStats(S.ls.states, S.priv.stats);
-      const max = Math.max.apply(null, L.AREAS.map(function (a) { return stats[a.key].read; }).concat([1]));
-      const t = today(), states = S.ls.states, ids = Object.keys(states);
-      const sure = ids.filter(function (id) { return !states[id].known && (states[id].box || 0) >= 3; }).length;
-      const monday = L.addDays(t, -((new Date(t + 'T12:00:00Z').getUTCDay() + 6) % 7));
-      const weekRead = ids.filter(function (id) { const d = L.dateOfISO(states[id].seenAt); return d && d >= monday && !states[id].known; }).length;
-      const weekDays = Object.keys(S.ls.days).filter(function (d) { return d >= monday && d <= t && L.dayCounts(S.ls.days[d]); }).length;
-      let right = 0, total = 0;
-      const areas = (S.priv.stats && S.priv.stats.areas) || {};
-      Object.keys(areas).forEach(function (k) { (areas[k].recent || []).forEach(function (v) { total += 1; right += v ? 1 : 0; }); });
-      const pct = total ? Math.round(100 * right / total) : null;
-      const start = L.addDays(monday, -28), cells = [];
-      for (let i = 0; i < 35; i += 1) {
-        const d = L.addDays(start, i), rec = S.ls.days[d];
-        cells.push(h('i', { class: (rec && L.dayCounts(rec) ? 'on' : '') + (d === t ? ' now' : '') + (d > t ? ' later' : ''), title: L.formatDay(d) }));
-      }
-      const streak = L.streak(S.ls.days, t);
-      return h('div', { class: 'section' },
-        h('div', { class: 'tiles' }, tile(L.learnedCount(states), 'gelernt'), tile(sure, 'sicher gewusst'), tile(streak, streak === 1 ? 'Tag in Folge' : 'Tage in Folge')),
-        h('div', { class: 'weekline' }, h('b', { text: 'Diese Woche' }),
-          h('span', { text: weekRead + (weekRead === 1 ? ' Fakt' : ' Fakten') + ' · ' + weekDays + (weekDays === 1 ? ' Tag' : ' Tage') + (pct === null ? '' : ' · ' + pct + ' % richtig') })),
-        h('div', {}, h('div', { class: 'calhead' }, ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(function (d) { return h('span', { text: d }); })),
-          h('div', { class: 'cal', role: 'img', 'aria-label': 'Lerntage der letzten fünf Wochen' }, cells)),
-        h('details', { class: 'more' }, h('summary', { text: 'Bereiche' }),
-          h('div', {}, h('p', { class: 'hint', text: 'Gelesene Fakten und Trefferquote deiner letzten 30 Antworten.' }), L.AREAS.map(function (a) { return areaRow(a, stats, max); }))));
-    }
-    function tile(n, label) { return h('div', { class: 'tile' }, h('b', { text: String(n) }), h('span', { text: label })); }
-    function stepper(label, value, onminus, onplus, minusOff, plusOff) {
-      return h('div', { class: 'stepper', role: 'group', 'aria-label': label },
-        h('button', { type: 'button', text: '−', 'aria-label': label + ': weniger', disabled: minusOff, onclick: onminus }),
-        h('output', { text: String(value) }),
-        h('button', { type: 'button', text: '+', 'aria-label': label + ': mehr', disabled: plusOff, onclick: onplus }));
-    }
-    /* How many facts at which time. Starts from the admin's default; a change applies to this person only. */
-    function planSection() {
-      const c = planCfg();
-      const setCount = function (b, d) {
-        const next = Object.assign({}, c.counts);
-        next[b] += d;
-        writePriv('settings', { counts: next });
+    out.push(h('section', { class: 'card stat', 'data-key': 'st-cal' }, h('p', { class: 'kicker', text: 'Lerntage' }),
+      h('p', { class: 'hint', text: plural(days, 'Tag', 'Tage') + ' in den letzten fünf Wochen. Ein Tag zählt, sobald du eine Etappe, die Wiederholung oder eine Übung fertig hast.' }),
+      h('div', {}, h('div', { class: 'calhead' }, ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(function (d) { return h('span', { text: d }); })),
+        h('div', { class: 'cal', role: 'img', 'aria-label': days + ' Lerntage in den letzten fünf Wochen' }, cells))));
+    return out;
+  }
+  function stepper(label, value, onminus, onplus, minusOff, plusOff) {
+    return h('div', { class: 'stepper', role: 'group', 'aria-label': label },
+      h('button', { type: 'button', text: '−', 'aria-label': label + ': weniger', disabled: minusOff, onclick: onminus }),
+      h('output', { text: String(value) }),
+      h('button', { type: 'button', text: '+', 'aria-label': label + ': mehr', disabled: plusOff, onclick: onplus }));
+  }
+  /* How many facts at which time. Starts from the admin's default; a change applies to this person only. */
+  function planSection() {
+    const c = planCfg();
+    const setCount = function (b, d) {
+      const next = Object.assign({}, c.counts);
+      next[b] += d;
+      writePriv('settings', { counts: next });
+      planChanged();
+    };
+    return h('div', { class: 'section' },
+      h('div', { class: 'planhead' }, h('h3', { text: 'Tagesplan' }), h('span', { class: 'hint', text: c.total + (c.total === 1 ? ' Fakt' : ' Fakten') + ' am Tag' })),
+      L.BLOCKS.map(function (b) {
+        const input = h('input', { id: 'time_' + b, type: 'time', value: c.times[b], 'aria-label': L.BLOCK_NAMES[b] + ', Uhrzeit',
+          onchange: function (e) {
+            const el = e.target;
+            if (L.parseTime(el.value) === null) { el.value = planCfg().times[b]; return; }
+            const patch = { times: {} };
+            patch.times[b] = el.value;
+            writePriv('settings', patch);
+            planChanged();
+          } });
+        return h('div', { class: 'planrow' + (c.counts[b] ? '' : ' off') }, h('label', { for: 'time_' + b, text: L.BLOCK_NAMES[b] }), input,
+          stepper(L.BLOCK_NAMES[b], c.counts[b], function () { setCount(b, -1); }, function () { setCount(b, 1); }, c.counts[b] === 0 || c.total <= 1, c.total >= L.MAX_PER_DAY));
+      }),
+      h('div', { class: 'planrow' }, h('span', { class: 'wide', text: 'Nachholen pro Tag' }),
+        stepper('Nachholen pro Tag', c.catchup, function () { writePriv('settings', { catchup: c.catchup - 1 }); planChanged(); },
+          function () { writePriv('settings', { catchup: c.catchup + 1 }); planChanged(); }, c.catchup <= 0, c.catchup >= L.MAX_CATCHUP)),
+      h('p', { class: 'hint', text: c.custom ? 'Das ist deine eigene Einstellung.' : 'Vorgabe vom Admin. Was du änderst, gilt nur für dich.' }),
+      c.custom ? btn('Zurück zur Vorgabe', 'link', function () {
+        writePriv('settings', { times: null, counts: null, catchup: null });
         planChanged();
-        sheet.draw();
-      };
-      return h('div', { class: 'section' },
-        h('div', { class: 'planhead' }, h('h3', { text: 'Tagesplan' }), h('span', { class: 'hint', text: c.total + (c.total === 1 ? ' Fakt' : ' Fakten') + ' am Tag' })),
-        L.BLOCKS.map(function (b) {
-          let dirty = false;
-          const input = h('input', { id: 'time_' + b, type: 'time', value: c.times[b], 'aria-label': L.BLOCK_NAMES[b] + ', Uhrzeit',
-            onchange: function () {
-              if (L.parseTime(input.value) === null) { input.value = c.times[b]; return; }
-              const patch = { times: {} };
-              patch.times[b] = input.value;
-              writePriv('settings', patch);
-              dirty = true;
-              planChanged();
-            },
-            onblur: function () { if (dirty) { dirty = false; sheet.draw(); } } });
-          return h('div', { class: 'planrow' + (c.counts[b] ? '' : ' off') }, h('label', { for: 'time_' + b, text: L.BLOCK_NAMES[b] }), input,
-            stepper(L.BLOCK_NAMES[b], c.counts[b], function () { setCount(b, -1); }, function () { setCount(b, 1); }, c.counts[b] === 0 || c.total <= 1, c.total >= L.MAX_PER_DAY));
+      }) : null);
+  }
+  function settingsView() {
+    const t = times();
+    return [
+      planSection(),
+      h('div', { class: 'section' },
+        pushRow(t),
+        h('label', { class: 'switchrow' }, h('span', { text: 'Haptik' }),
+          h('input', { id: 'hapticsToggle', type: 'checkbox', role: 'switch', checked: hapticsOn(), onchange: function (e) {
+            writePriv('settings', { haptics: !!e.target.checked });
+            if (e.target.checked) setTimeout(function () { tick('single'); }, 0);
+          } }))),
+      standalone() ? null : h('p', { class: 'hint pad', text: 'Tipp: In Safari „Teilen“ → „Zum Home-Bildschirm“. Dann startet Lumen wie eine App, geht offline und kann dich erinnern.' }),
+      h('div', { class: 'section' }, h('h3', { text: 'Darstellung' }),
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Darstellung' }, [['auto', 'Auto'], ['light', 'Hell'], ['dark', 'Dunkel'], ['black', 'Schwarz']].map(function (o) {
+          return h('button', { type: 'button', text: o[1], 'aria-pressed': String((settings().theme || 'auto') === o[0]), onclick: function () { writePriv('settings', { theme: o[0] }); setTheme(o[0]); } });
+        })))
+    ];
+  }
+  function accountView() {
+    const u = S.authUser || {};
+    const fileInput = h('input', { id: 'importFile', type: 'file', accept: 'application/json,.json', onchange: function (e) { importBackup(e.target.files && e.target.files[0]); e.target.value = ''; } });
+    return [
+      h('div', { class: 'section' }, h('h3', { text: 'Profil' }),
+        nameField(),
+        h('p', { class: 'hint', text: 'Angemeldet als ' + (u.email || '') + (S.lastFacts ? ' · Fakten bis ' + L.formatDay(S.lastFacts) : '') })),
+      h('div', { class: 'section' }, h('h3', { text: 'Sicherung' }),
+        btn('Sicherung herunterladen', 'secondary', exportBackup),
+        h('label', { class: 'field' }, h('span', { text: 'Sicherung einspielen' }), fileInput)),
+      h('div', { class: 'section' }, h('h3', { text: 'Konto' }),
+        btn('Passwort ändern', 'secondary', function () {
+          withReturn(function (o) { return C.auth.sendPasswordResetEmail(u.email, o); }).then(function () { toast('Ein Link zum Ändern ist an ' + u.email + ' unterwegs.'); }, function (e) { toast(C.message(e)); });
         }),
-        h('div', { class: 'planrow' }, h('span', { class: 'wide', text: 'Nachholen pro Tag' }),
-          stepper('Nachholen pro Tag', c.catchup, function () { writePriv('settings', { catchup: c.catchup - 1 }); planChanged(); sheet.draw(); },
-            function () { writePriv('settings', { catchup: c.catchup + 1 }); planChanged(); sheet.draw(); }, c.catchup <= 0, c.catchup >= L.MAX_CATCHUP)),
-        h('p', { class: 'hint', text: c.custom ? 'Das ist deine eigene Einstellung.' : 'Vorgabe vom Admin. Was du änderst, gilt nur für dich.' }),
-        c.custom ? btn('Zurück zur Vorgabe', 'link', function () {
-          writePriv('settings', { times: null, counts: null, catchup: null });
-          planChanged();
-          sheet.draw();
-        }) : null);
-    }
-    function settingsView() {
-      const t = times(), u = S.authUser || {};
-      const fileInput = h('input', { id: 'importFile', type: 'file', accept: 'application/json,.json', onchange: function (e) { importBackup(e.target.files && e.target.files[0]); e.target.value = ''; } });
-      return [
-        h('div', { class: 'section' }, h('h3', { text: 'Darstellung' }),
-          h('div', { class: 'seg', role: 'group', 'aria-label': 'Darstellung' }, [['auto', 'Auto'], ['light', 'Hell'], ['dark', 'Dunkel'], ['black', 'Schwarz']].map(function (o) {
-            return h('button', { type: 'button', text: o[1], 'aria-pressed': String((settings().theme || 'auto') === o[0]), onclick: function () { writePriv('settings', { theme: o[0] }); setTheme(o[0]); } });
-          }))),
-        planSection(),
-        h('div', { class: 'section' },
-          h('label', { class: 'switchrow' }, h('span', { text: 'Haptik' }),
-            h('input', { id: 'hapticsToggle', type: 'checkbox', role: 'switch', checked: hapticsOn(), onchange: function (e) {
-              writePriv('settings', { haptics: !!e.target.checked });
-              if (e.target.checked) setTimeout(function () { tick('single'); }, 0);
-            } })),
-          pushRow(t)),
-        standalone() ? null : h('p', { class: 'hint', text: 'Tipp: In Safari „Teilen“ → „Zum Home-Bildschirm“. Dann startet Lumen wie eine App, geht offline und kann dich erinnern.' }),
-        h('details', { class: 'more', open: accountOpen, ontoggle: function (e) { accountOpen = e.target.open; } }, h('summary', { text: 'Konto und Daten' }),
-          h('div', {},
-            h('p', { class: 'hint', text: 'Angemeldet als ' + (u.email || '') + (S.lastFacts ? ' · Fakten bis ' + L.formatDay(S.lastFacts) : '') }),
-            nameField(),
-            btn('Sicherung herunterladen', 'secondary', exportBackup),
-            h('label', { class: 'field' }, h('span', { text: 'Sicherung einspielen' }), fileInput),
-            btn('Passwort ändern', 'secondary', function () {
-              withReturn(function (o) { return C.auth.sendPasswordResetEmail(u.email, o); }).then(function () { toast('Ein Link zum Ändern ist an ' + u.email + ' unterwegs.'); }, function (e) { toast(C.message(e)); });
-            }),
-            btn('Abmelden', 'secondary', signOut),
-            btn('Konto löschen', 'link', openDeleteAccount),
-            h('p', { class: 'hint', text: 'Dein Lernstand liegt in einer Datenbank in Frankfurt. Der Admin sieht deinen Fortschritt und deine Fehlermeldungen, kein Passwort.' })))
-      ];
-    }
+        btn('Abmelden', 'secondary', signOut),
+        btn('Konto löschen', 'link', openDeleteAccount)),
+      h('p', { class: 'hint pad', text: 'Dein Lernstand liegt in einer Datenbank in Frankfurt. Der Admin sieht deinen Fortschritt und deine Fehlermeldungen, kein Passwort.' })
+    ];
   }
   function download(name, text) {
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -2628,13 +2889,15 @@ details.more { border-top: .5px solid var(--line); }
 
   document.querySelectorAll('.tabs button').forEach(function (b) {
     b.addEventListener('click', function () {
+      if (S.tab === 'you' && b.dataset.tab === 'you' && S.youPage) { openYou(null); return; }
       if (S.tab === b.dataset.tab) { scrollTop(); return; }
       S.tab = b.dataset.tab;
       render();
       scrollTop();
     });
   });
-  $('btnProgress').addEventListener('click', function () { if (S.phase === 'ready') openProgress(); });
+  $('btnProgress').addEventListener('click', function () { if (S.phase === 'ready') openYou(S.tab === 'you' ? 'settings' : null); });
+  $('btnBack').addEventListener('click', function () { openYou(null); });
   /* A light tick on every tap of a button, chip, switch or link-button. */
   document.addEventListener('click', function (e) {
     const t = e.target && e.target.closest ? e.target.closest('button, a.btn, [role="button"], input[type="checkbox"], input[type="radio"], select') : null;
@@ -2643,7 +2906,7 @@ details.more { border-top: .5px solid var(--line); }
   }, true);
   /* Swipe left or right on the page to move between Heute, Üben and Archiv. */
   (function () {
-    const order = ['today', 'practice', 'archive'];
+    const order = ['today', 'practice', 'archive', 'you'];
     let x0 = null, y0 = 0, t0 = 0;
     $('main').addEventListener('touchstart', function (e) {
       if (e.touches.length !== 1 || S.phase !== 'ready' || e.target.closest('.chips, input, textarea, .options')) { x0 = null; return; }
@@ -2654,6 +2917,7 @@ details.more { border-top: .5px solid var(--line); }
       const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
       x0 = null;
       if (Math.abs(dx) < 70 || Math.abs(dx) < 1.8 * Math.abs(dy) || Date.now() - t0 > 600) return;
+      if (S.tab === 'you' && S.youPage) { if (dx > 0) { tick('single'); openYou(null); } return; }
       const i = order.indexOf(S.tab) + (dx < 0 ? 1 : -1);
       if (i < 0 || i >= order.length) return;
       S.tab = order[i];
@@ -2676,6 +2940,7 @@ details.more { border-top: .5px solid var(--line); }
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && S.sheets.length) closeSheet(S.sheets[S.sheets.length - 1]);
+    else if (e.key === 'Escape' && S.tab === 'you' && S.youPage) openYou(null);
   });
   function clock() {
     S.now = new Date();
