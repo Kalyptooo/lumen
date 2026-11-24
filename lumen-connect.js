@@ -19,7 +19,7 @@
     digital: 'Digitale Sicherheit', verkehr: 'Auto, Verkehr & Reisen', tech: 'Tech & Geräte', erklaert: 'Wie funktioniert das?',
     natur: 'Natur & Wissenschaft', geschichte: 'Geschichte & Politik', kultur: 'Geografie, Kultur & Sprache', denken: 'Denken & Kommunikation'
   };
-  const ADMIN_SECTIONS = ['overview', 'people', 'settings', 'facts', 'reports', 'weekly'];
+  const ADMIN_SECTIONS = ['overview', 'people', 'settings', 'facts', 'reports', 'weekly', 'usage'];
   const INFO = {
     id: 'lumen', name: 'Lumen', contract: CONTRACT, description: 'Allgemeinwissen: jeden Tag ein paar Fakten, Quiz und Auffrischung.',
     icon: BASE + 'icon-180.png', app: BASE, admin: BASE + 'admin.html'
@@ -60,6 +60,7 @@
     if (pending) return pending;
     pending = (async function () {
       let auth, db, fb = null;
+      if (!window.LumenUsage) await load(BASE + 'lumen-usage.js');
       const fake = window.LumenCloud && window.LumenCloud.fake ? window.LumenCloud : null;
       if (fake) { auth = fake.auth; db = fake.db; }
       else {
@@ -102,7 +103,7 @@
     async function access() {
       const a = await db.doc('config/access').get();
       const d = a.exists ? (a.data() || {}) : {};
-      return { adminEmails: (d.adminEmails || []).map(norm), invited: (d.invited || []).map(norm) };
+      return { adminEmails: (d.adminEmails || []).map(norm), invited: (d.invited || []).map(norm), usage: d.usage || null };
     }
 
     async function gather() {
@@ -184,7 +185,10 @@
       const daysLeft = factsUntil ? daysBetween(t, factsUntil) : null;
       const runAge = run && run.at ? Math.floor((Date.now() - Date.parse(run.at)) / 86400000) : null;
 
+      const usage = window.LumenUsage ? window.LumenUsage.assess(g.acc.usage, rows.length) : null;
       const attention = [];
+      if (usage && usage.verdict.level !== 'ok') attention.push({ level: usage.verdict.level, text: usage.verdict.title, link: link('usage') });
+      else if (usage && usage.stale) attention.push({ level: 'info', text: usage.verdict.note, link: link('usage') });
       if (reports.length) attention.push({ level: 'warn', text: reports.length + ' offene Fehlermeldung' + (reports.length === 1 ? '' : 'en'), link: link('reports') });
       if (daysLeft !== null && daysLeft < 7) attention.push({ level: daysLeft < 3 ? 'alert' : 'warn', text: 'Fakten nur noch für ' + Math.max(0, daysLeft) + ' Tage', link: link('weekly') });
       if (runAge !== null && runAge > 8) attention.push({ level: 'warn', text: 'Wochenaufgabe lief seit ' + runAge + ' Tagen nicht', link: link('weekly') });
@@ -206,6 +210,7 @@
         reports: { open: reports.length, items: reports.slice(0, 10) },
         content: { factsUntil: factsUntil, daysLeft: daysLeft, lastRun: run ? { at: run.at || '', added: run.added || 0, notes: run.notes || '' } : null, newsDate: (run && run.newsDate) || '' },
         notice: { text: (g.pub.notice && g.pub.notice.text) || '', at: (g.pub.notice && g.pub.notice.at) || '' },
+        usage: usage,
         attention: attention
       };
       cacheAt = Date.now();

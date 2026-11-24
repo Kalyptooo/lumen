@@ -123,6 +123,21 @@ header h1 { font-size: 2.125rem; font-weight: 800; letter-spacing: -.022em; line
 .tabs button[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--seg-on); }
 input[type="email"], input[type="password"], input[type="text"], textarea, select, .planrow input[type="time"] { border: 0; border-radius: 14px; background: var(--surface-2); font-size: max(1rem, 16px); }
 @media (max-width: 40rem) { header h1 { font-size: 1.875rem; } }
+.usage-row { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: .5px solid var(--line); }
+.usage-row:first-of-type { border-top: 0; padding-top: 0; }
+.usage-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.usage-row .hint { margin: 0; }
+.usage-bar { height: 8px; border-radius: 4px; }
+.usage-bar i { background: var(--good); }
+.usage-bar.warn i { background: var(--warn); }
+.usage-bar.alert i { background: var(--danger); }
+.pill { font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.pill.ok { color: var(--good); } .pill.warn { color: var(--warn); } .pill.alert { color: var(--danger); }
+.usage-verdict { border-left: 6px solid var(--good); }
+.usage-verdict.warn { border-left-color: var(--warn); } .usage-verdict.alert { border-left-color: var(--danger); }
+.usage-free { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.usage-free li { display: flex; flex-direction: column; }
+.usage-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 </style>
 </head>
 <body>
@@ -134,6 +149,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="lumen-cloud.js"></script>
+<script src="lumen-usage.js"></script>
 <script>
 (function () {
   'use strict';
@@ -147,7 +163,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
   const AREA_NAME = {};
   AREAS.forEach(function (a) { AREA_NAME[a[0]] = a[1]; });
   const DEFAULT_TIMES = { morgen: '07:00', mittag: '12:00', abend: '18:00' };
-  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['settings', 'Für alle'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['weekly', 'Wochenaufgabe']];
+  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['settings', 'Für alle'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['weekly', 'Wochenaufgabe'], ['usage', 'Auslastung']];
   const S = {
     phase: 'boot', user: null, tab: 'overview', access: null, pub: null, members: {}, digests: {}, manifest: null,
     form: { email: '', password: '', error: '', busy: false }, titles: {}, weights: null, wish: null, busy: false,
@@ -401,7 +417,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
       TABS.map(function (t) {
         return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; setHash(); render(); } });
       })));
-    const view = { overview: overview, people: people, settings: forAll, facts: facts, reports: reports, weekly: weekly }[S.tab];
+    const view = { overview: overview, people: people, settings: forAll, facts: facts, reports: reports, weekly: weekly, usage: usageView }[S.tab];
     add(root, view());
   }
   function signinCard() {
@@ -446,6 +462,8 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     const notes = [];
     if (open) notes.push(h('p', {}, open + ' offene Fehlermeldung' + (open === 1 ? '' : 'en') + '. ', h('a', { href: '#', text: 'Zu den Meldungen', onclick: function (e) { e.preventDefault(); S.tab = 'reports'; render(); } })));
     if (idle.length) notes.push(h('p', { text: 'Länger als eine Woche nicht da: ' + idle.map(function (r) { return r.name || r.email; }).join(', ') + '.' }));
+    const ua = usageAssess();
+    if (ua && ua.verdict.level !== 'ok') notes.push(h('p', {}, ua.verdict.title + '. ', h('a', { href: '#usage', text: 'Zur Auslastung', onclick: function (e) { e.preventDefault(); S.tab = 'usage'; setHash(); render(); } })));
     if (noAccount.length) notes.push(h('p', { text: 'Freigeschaltet, aber noch kein Konto: ' + noAccount.join(', ') + '.' }));
     if (m.lastDate && m.lastDate < addDays(t, 14)) notes.push(h('p', { text: 'Der Vorrat reicht nur noch bis ' + fmtDay(m.lastDate) + '. Die Wochenaufgabe füllt sonntags auf.' }));
     return [
@@ -740,6 +758,48 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
 
   /* ---------- reports ---------- */
 
+  /* ---------- Auslastung: how full the free limits are (measured hourly by tools/usage-report.mjs) ---------- */
+  function usageAssess() { return window.LumenUsage ? window.LumenUsage.assess(S.access.usage, personRows().length) : null; }
+  function usageHelp(err) {
+    const disabled = /disabled|has not been used|SERVICE_DISABLED/i.test(err);
+    const P = 'lumen-f76be';
+    const step = function (t, href, label) { return h('li', {}, t, href ? h('a', { href: href, target: '_blank', rel: 'noopener', text: label }) : null); };
+    return h('div', { class: 'card' }, h('h2', { text: 'Einmal freigeben: Zahlen der Datenbank' }),
+      h('p', { class: 'muted', text: 'Wie oft die Datenbank liest und schreibt, kennt nur Google. Lumen darf diese Zahlen noch nicht abrufen. Das gibst du einmal frei, es dauert etwa 2 Minuten. Lumen bekommt dadurch nur Leserechte auf die Zahlen, nichts sonst.' }),
+      h('ol', { class: 'usage-steps' }, disabled ? [
+        step('Öffne ', 'https://console.cloud.google.com/apis/library/monitoring.googleapis.com?project=' + P, 'Cloud Monitoring API'),
+        step('Klicke auf „Aktivieren“.'),
+        step('Danach erscheinen die Zahlen spätestens nach einer Stunde.')
+      ] : [
+        step('Öffne ', 'https://console.cloud.google.com/iam-admin/iam?project=' + P, 'Google Cloud → IAM'),
+        step('Suche die Zeile mit „firebase-adminsdk“ und klicke rechts auf den Stift.'),
+        step('„Weitere Rolle hinzufügen“ → „Monitoring-Betrachter“ (englisch „Monitoring Viewer“) wählen → Speichern.'),
+        step('Danach erscheinen die Zahlen spätestens nach einer Stunde.')
+      ]),
+      h('p', { class: 'hint', text: 'Technische Meldung: ' + err }));
+  }
+  function usageView() {
+    const a = usageAssess();
+    if (!a) return h('div', { class: 'card' }, h('p', { class: 'muted', text: 'Die Auslastung konnte nicht geladen werden.' }));
+    const word = { ok: 'Gut', warn: 'Knapp', alert: 'Eng', unknown: 'Offen' };
+    const when = a.at ? new Date(a.at).toLocaleString('de-AT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '';
+    return [
+      h('div', { class: 'card usage-verdict ' + a.verdict.level }, h('h2', { text: a.verdict.title }), h('p', { text: a.verdict.text }),
+        a.verdict.note ? h('p', { class: 'hint', text: a.verdict.note }) : null,
+        when ? h('p', { class: 'hint', text: 'Gemessen am ' + when + '. ' + a.resetNote }) : null),
+      a.lacksAccess ? usageHelp(a.accessError) : null,
+      h('div', { class: 'card' }, h('h2', { text: 'Grenzen im kostenlosen Tarif' }), a.items.map(function (i) {
+        const hasPct = typeof i.pct === 'number';
+        return h('div', { class: 'usage-row' },
+          h('div', { class: 'usage-head' }, h('strong', { text: i.name }), h('span', { class: 'pill ' + i.level, text: word[i.level] })),
+          hasPct ? h('div', { class: 'bar usage-bar ' + i.level }, h('i', { style: 'width:' + Math.min(100, Math.max(1, i.pct)) + '%' })) : null,
+          h('p', { class: 'hint', text: i.text + (hasPct ? ' · ' + i.pct.toLocaleString('de-AT') + ' %' : '') }),
+          i.forecast ? h('p', { class: 'hint', text: i.forecast }) : null);
+      })),
+      h('div', { class: 'card' }, h('h2', { text: 'Kostenlos, hier wird es nicht eng' }),
+        h('ul', { class: 'usage-free' }, a.free.map(function (f) { return h('li', {}, h('strong', { text: f.name }), h('span', { class: 'hint', text: f.text })); })))
+    ];
+  }
   function reports() {
     const list = allReports(), open = list.filter(function (r) { return !handled(r); });
     const toSend = open.filter(function (r) { return !forwarded(r); });

@@ -43,6 +43,8 @@ Mit dem Lumen-Admin-Konto, einmal pro Gerät. Die Anmeldung bleibt gespeichert.
   reports:  { open, items: [{ factId, note, reportedAt }] },
   content:  { factsUntil, daysLeft, lastRun: { at, added, notes }, newsDate },
   notice:   { text, at },
+  usage:    { verdict: { level, title, text, note }, items: [{ key, name, used, limit, pct, level, text, forecast }],
+              free: [{ name, text }], at, stale, lacksAccess },
   attention: [{ level: 'info' | 'warn' | 'alert', text, link }]
 }
 ```
@@ -54,6 +56,7 @@ Mit dem Lumen-Admin-Konto, einmal pro Gerät. Die Anmeldung bleibt gespeichert.
 - die Wochenaufgabe lief über 8 Tage nicht
 - Personen sind freigeschaltet, aber noch nicht registriert
 - Personen waren länger als eine Woche nicht da
+- eine kostenlose Grenze wird knapp, oder die stündliche Messung der Auslastung fehlt
 
 `lumen.people()` gibt die Personenliste zurück, die zuletzt Aktiven zuerst: `uid, name, email, lastSeen, streak, learned, answered, pct, due, reports, admin, unlocked, link`.
 
@@ -89,6 +92,7 @@ Bewusst **nicht** im Anschluss sind die folgenden Aktionen. Sie gibt es nur auf 
 | `facts` | Fakten bearbeiten |
 | `reports` | Fehlermeldungen |
 | `weekly` | Wochenaufgabe |
+| `usage` | Auslastung der kostenlosen Grenzen |
 
 ## Sicherheit
 
