@@ -591,7 +591,11 @@ test('Tagesplan: eigene Einstellung schlägt die Admin-Vorgabe, nur wenn gesetzt
   let c = L.dayConfig(admin, {});
   eq([c.total, c.catchup, c.times.morgen, c.times.abend, c.custom], [3, 1, '08:00', '18:00', false]);
   c = L.dayConfig(admin, { counts: { morgen: 0, mittag: 4, abend: 0 }, catchup: 0, times: { morgen: '06:30' } });
-  eq([c.total, c.counts.mittag, c.catchup, c.times.morgen, c.custom], [4, 4, 0, '06:30', true]);
+  eq([c.total, c.counts.mittag, c.catchup, c.times.morgen, c.custom], [3, 3, 0, '06:30', true], 'nie mehr als die Admin-Vorgabe');
+  c = L.dayConfig(admin, { counts: { morgen: 1, mittag: 1, abend: 0 } });
+  eq([c.total, c.max], [2, 3], 'weniger geht');
+  c = L.dayConfig({}, { counts: { morgen: 4, mittag: 3, abend: 3 } });
+  eq([c.counts.morgen, c.counts.mittag, c.counts.abend, c.max], [4, 1, 0, 5], 'zu viel wird vom Abend her gekürzt');
   c = L.dayConfig(admin, { counts: null, catchup: null, times: null });
   eq([c.total, c.catchup, c.times.morgen, c.custom], [3, 1, '08:00', false], 'zurück zur Vorgabe');
   eq(L.normalizeCounts({ morgen: 8, mittag: 8, abend: 8 }), { morgen: 8, mittag: 2, abend: 0 }, 'höchstens zehn');
