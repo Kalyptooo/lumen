@@ -858,15 +858,28 @@ details.more { border-top: .5px solid var(--line); }
     });
     return left === MAX_PER_DAY ? Object.assign({}, DEFAULT_COUNTS) : out;
   }
-  /* The admin sets the default for everyone; what a person sets for themselves replaces it, for that person only. */
+  /* Trim counts to at most max facts a day, taking from the evening first. */
+  function capCounts(counts, max) {
+    const out = Object.assign({}, counts);
+    let over = BLOCKS.reduce(function (n, b) { return n + out[b]; }, 0) - max;
+    BLOCKS.slice().reverse().forEach(function (b) { const cut = Math.min(out[b], Math.max(0, over)); out[b] -= cut; over -= cut; });
+    return out;
+  }
+  /* The admin sets the default for everyone; what a person sets for themselves replaces it, for that person only.
+     A person may spread the facts differently or take fewer, never more than the admin's number:
+     the weekly task only writes that many facts per day, so more would empty the store too early. */
   function dayConfig(admin, personal) {
     const a = admin || {}, p = personal || {};
-    const counts = normalizeCounts(p.counts && typeof p.counts === 'object' ? p.counts : (a.defaultCounts || DEFAULT_COUNTS));
+    const base = normalizeCounts(a.defaultCounts || DEFAULT_COUNTS);
+    const max = BLOCKS.reduce(function (n, b) { return n + base[b]; }, 0);
+    let counts = p.counts && typeof p.counts === 'object' ? capCounts(normalizeCounts(p.counts), max) : base;
+    if (!BLOCKS.some(function (b) { return counts[b] > 0; })) counts = base;
     const c = Number.isInteger(p.catchup) ? p.catchup : (Number.isInteger(a.defaultCatchup) ? a.defaultCatchup : DEFAULT_CATCHUP);
     return {
       times: Object.assign({}, DEFAULT_TIMES, a.defaultTimes || {}, p.times || {}),
       counts: counts,
       total: BLOCKS.reduce(function (n, b) { return n + counts[b]; }, 0),
+      max: max,
       catchup: Math.max(0, Math.min(MAX_CATCHUP, c)),
       custom: !!(p.times || p.counts) || Number.isInteger(p.catchup)
     };
@@ -1215,7 +1228,7 @@ details.more { border-top: .5px solid var(--line); }
   const api = {
     TZ: TZ, INTERVALS: INTERVALS, BLOCKS: BLOCKS, BLOCK_NAMES: BLOCK_NAMES, DEFAULT_TIMES: DEFAULT_TIMES,
     QUIZ_LIMIT: QUIZ_LIMIT, DAILY_LIMIT: DAILY_LIMIT, CATCHUP_DAYS: CATCHUP_DAYS, DEFAULT_COUNTS: DEFAULT_COUNTS, DEFAULT_CATCHUP: DEFAULT_CATCHUP, MAX_CATCHUP: MAX_CATCHUP, MAX_PER_DAY: MAX_PER_DAY,
-    normalizeCounts: normalizeCounts, dayConfig: dayConfig, pickDayFacts: pickDayFacts, assignBlocks: assignBlocks, AREAS: AREAS, AREA_BY_KEY: AREA_BY_KEY, NEWS_AREAS: NEWS_AREAS,
+    normalizeCounts: normalizeCounts, capCounts: capCounts, dayConfig: dayConfig, pickDayFacts: pickDayFacts, assignBlocks: assignBlocks, AREAS: AREAS, AREA_BY_KEY: AREA_BY_KEY, NEWS_AREAS: NEWS_AREAS,
     viennaParts: viennaParts, isDateStr: isDateStr, addDays: addDays, diffDays: diffDays, todayStr: todayStr,
     yesterdayStr: yesterdayStr, weekdayOf: weekdayOf, dateOfISO: dateOfISO, parseTime: parseTime, formatDay: formatDay,
     factDate: factDate, monthDocId: monthDocId, bySlot: bySlot, byDateSlot: byDateSlot, factsOfDayDoc: factsOfDayDoc,
@@ -2803,12 +2816,12 @@ details.more { border-top: .5px solid var(--line); }
             planChanged();
           } });
         return h('div', { class: 'planrow' + (c.counts[b] ? '' : ' off') }, h('label', { for: 'time_' + b, text: L.BLOCK_NAMES[b] }), input,
-          stepper(L.BLOCK_NAMES[b], c.counts[b], function () { setCount(b, -1); }, function () { setCount(b, 1); }, c.counts[b] === 0 || c.total <= 1, c.total >= L.MAX_PER_DAY));
+          stepper(L.BLOCK_NAMES[b], c.counts[b], function () { setCount(b, -1); }, function () { setCount(b, 1); }, c.counts[b] === 0 || c.total <= 1, c.total >= c.max));
       }),
       h('div', { class: 'planrow' }, h('span', { class: 'wide', text: 'Nachholen pro Tag' }),
         stepper('Nachholen pro Tag', c.catchup, function () { writePriv('settings', { catchup: c.catchup - 1 }); planChanged(); },
           function () { writePriv('settings', { catchup: c.catchup + 1 }); planChanged(); }, c.catchup <= 0, c.catchup >= L.MAX_CATCHUP)),
-      h('p', { class: 'hint', text: c.custom ? 'Das ist deine eigene Einstellung.' : 'Vorgabe vom Admin. Was du änderst, gilt nur für dich.' }),
+      h('p', { class: 'hint', text: (c.custom ? 'Das ist deine eigene Einstellung. ' : 'Vorgabe vom Admin. Was du änderst, gilt nur für dich. ') + 'Du kannst die Fakten anders verteilen oder weniger nehmen, aber höchstens ' + c.max + ' am Tag.' }),
       c.custom ? btn('Zurück zur Vorgabe', 'link', function () {
         writePriv('settings', { times: null, counts: null, catchup: null });
         planChanged();
