@@ -621,6 +621,39 @@ test('Nach zehn Tagen Pause kommen nur ein paar zum Nachholen, nichts über die 
   eq(L.selectCatchup(pool, {}, today, today, { limit: 2, maxSlot: 5 }), [], 'wer heute anfängt, holt nichts nach');
 });
 
+test('youStats: Woche, Gedächtnis, Trefferquote, Rekord', () => {
+  const today = '2026-11-25'; // Mittwoch
+  const states = {
+    a: { seenAt: '2026-11-23T08:00:00Z', box: 0, area: 'geld' },
+    b: { seenAt: '2026-11-25T08:00:00Z', box: 1, area: 'geld' },
+    c: { seenAt: '2026-11-25T09:00:00Z', box: 4, area: 'recht' },
+    d: { seenAt: '2026-11-18T08:00:00Z', box: 3, area: 'recht' },
+    e: { seenAt: '2026-11-24T08:00:00Z', known: true, area: 'geld' }
+  };
+  const days = { '2026-11-01': { quizDone: true }, '2026-11-02': { quizDone: true }, '2026-11-03': { quizDone: true }, '2026-11-24': { quizDone: true }, '2026-11-25': { practiced: true } };
+  const stats = { areas: { geld: { recent: [1, 1, 1, 1, 1] }, recht: { recent: [1, 0, 0, 0, 1] } } };
+  const y = L.youStats(states, days, stats, today);
+  eq(y.monday, '2026-11-23');
+  eq(Array.from(y.week), [1, 0, 2, 0, 0, 0, 0]);
+  eq(y.weekTotal, 3);
+  eq(y.lastWeek, 1);
+  eq(y.activeDays, 3, 'Montag zählt durch den gelesenen Fakt');
+  eq(y.streak, 2);
+  eq(y.best, 3);
+  eq(y.learned, 4);
+  eq(y.known, 1);
+  eq({ ...y.mem }, { neu: 1, festigen: 1, sicher: 2 });
+  eq(y.answered, 10);
+  eq(y.pct, 70);
+  eq(y.strongest, 'geld');
+  eq(y.weakest, 'recht');
+  const empty = L.youStats({}, {}, null, today);
+  eq(empty.pct, null);
+  eq(empty.strongest, null);
+  eq(empty.weakest, null);
+  eq(empty.best, 0);
+});
+
 /* ---------- result ---------- */
 
 if (failures.length) {
