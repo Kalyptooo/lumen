@@ -1,7 +1,7 @@
 /* Lumen service worker.
    - Offline: pages, scripts and content are served from the network when possible and from the cache otherwise.
    - Reminders: Firebase Cloud Messaging shows the notifications sent by tools/send-reminders.mjs. */
-const CACHE = 'lumen-v10';
+const CACHE = 'lumen-v11';
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const SHELL = ['./', 'index.html', 'lumen-cloud.js', 'lumen-touch.js', 'firebase-config.js', 'manifest.webmanifest', 'icon-180.png', 'icon.svg',
   SDK + 'firebase-app-compat.js', SDK + 'firebase-auth-compat.js', SDK + 'firebase-firestore-compat.js', SDK + 'firebase-messaging-compat.js'];
