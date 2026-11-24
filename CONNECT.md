@@ -80,6 +80,33 @@ Bewusst **nicht** im Anschluss sind die folgenden Aktionen. Sie gibt es nur auf 
 - Fakten bearbeiten
 - Themen-Gewichte und Tagesplan ändern
 
+## Meldungen (Postfach)
+
+Alles Wichtige, was in Lumen passiert, landet als Meldung im Postfach. Das Dashboard holt es ab und zeigt es zusammen mit den Meldungen anderer Projekte. Jede Meldung sieht gleich aus:
+
+```js
+{ id, key, at, level: 'info' | 'warn' | 'alert', project: 'lumen', source, title, text, link, seen }
+```
+
+| Aufruf | Ergebnis |
+| --- | --- |
+| `lumen.events({ since, unseen, limit })` | Meldungen, neueste zuerst. `since` = ISO-Zeit, `unseen: true` = nur ungelesene |
+| `lumen.markSeen(at)` | alles bis `at` (Standard: jetzt) als gelesen markieren |
+| `lumen.send({ level, title, text, link, source })` | selbst eine Meldung ablegen, zum Beispiel vom Dashboard aus |
+| `lumen.usage()` | nur die Auslastung, mit einem einzigen Datenbank-Abruf |
+| `summary().inbox` | `{ unseen, latest }` für eine Zahl am Symbol |
+
+Wer Meldungen schickt:
+
+| Quelle | Wann |
+| --- | --- |
+| stündlicher Wächter (`tools/usage-report.mjs`) | neue Anmeldung, neue Fehlermeldung zu einem Fakt, Fehler in der App auf einem Handy, kostenlose Grenze wird knapp, Freigabe für die Zahlen fehlt, Fakten reichen keine 7 Tage mehr, Wochenaufgabe über 8 Tage still |
+| Erinnerungs-Ablauf | wenn er abbricht |
+| jedes Skript oder jeder Ablauf | `node tools/notify.mjs <info/warn/alert> "Titel" "Text" [Link] [Quelle]` |
+| das Dashboard | `lumen.send(...)` |
+
+Gespeichert wird in `config/access` (nur für Admins lesbar), höchstens 60 Meldungen. Dieselbe Meldung (gleicher `key`) kommt nur einmal. Der Wächter liest dafür stündlich die Personenliste mit. Das sind etwa 1.000 Lesungen am Tag, rund 2 % des freien Rahmens.
+
 ## Zur Admin-Seite springen
 
 `lumen.link(bereich, id)` oder `LumenConnect.link(...)` gibt die Adresse zurück. Die Admin-Seite öffnet sich dort, fragt aber zur Sicherheit selbst nach der Anmeldung.

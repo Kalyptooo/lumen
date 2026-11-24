@@ -125,6 +125,11 @@ button:disabled { opacity: .5; }
       s.attention.length ? h('ul', {}, s.attention.map(function (a) {
         return h('li', { class: a.level }, h('span', { text: a.text }), h('a', { href: a.link, target: '_blank', rel: 'noopener', text: 'Öffnen' }));
       })) : h('p', { class: 'msg', text: 'Nichts zu tun. Alles läuft.' }),
+      h('p', { class: 'label', text: 'Postfach' + (s.inbox.unseen ? ' · ' + s.inbox.unseen + ' neu' : '') }),
+      s.inbox.latest.length ? h('ul', {}, s.inbox.latest.map(function (e) {
+        return h('li', { class: e.level }, h('span', { text: e.title + (e.text ? ' – ' + e.text : '') }), e.link ? h('a', { href: e.link, target: '_blank', rel: 'noopener', text: 'Öffnen' }) : null);
+      })) : h('p', { class: 'msg', text: 'Keine neuen Meldungen.' }),
+      s.inbox.unseen ? h('div', { class: 'row' }, h('button', { type: 'button', class: 'quiet', text: 'Alles gelesen', onclick: function () { lumen.markSeen().then(refresh); } })) : null,
       h('p', { class: 'label', text: 'Mitteilung an alle' }), notice, h('div', { class: 'row' }, n.button, s.notice.text ? c.button : null), n.msg, c.msg,
       h('p', { class: 'label', text: 'Personen freischalten' }), invite, h('div', { class: 'row' }, inv.button), inv.msg,
       h('div', { class: 'row' }, h('a', { href: lumen.link('people'), target: '_blank', rel: 'noopener', text: 'Personen verwalten ↗' }),

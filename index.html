@@ -1508,6 +1508,22 @@ details.more { border-top: .5px solid var(--line); }
   /* ---------- digest: summary of the learning state for the admin page ---------- */
 
   let digestTimer = 0, digestBusy = false, digestAgain = false;
+  /* App errors on this device go into the person's digest (at most 3 a day, no repeats); the hourly watcher
+     (tools/usage-report.mjs) passes them on to the dashboard inbox. */
+  const ERR_KEY = 'lumen-errors';
+  function loadErrors() { try { const l = JSON.parse(localStorage.getItem(ERR_KEY) || '[]'); return Array.isArray(l) ? l.slice(-5) : []; } catch (e) { return []; } }
+  function recordError(msg, where) {
+    msg = String(msg || '').replace(/\s+/g, ' ').replace(/^Uncaught (Error: )?/, '').trim().slice(0, 160);
+    if (!msg || /ResizeObserver|^Script error|offline|network|Failed to fetch|Load failed|aborted/i.test(msg)) return;
+    const list = loadErrors(), day = new Date().toISOString().slice(0, 10);
+    const todays = list.filter(function (e) { return String(e.at).slice(0, 10) === day; });
+    if (todays.length >= 3 || todays.some(function (e) { return e.msg === msg; })) return;
+    list.push({ at: new Date().toISOString(), msg: msg, where: String(where || '').slice(0, 80) });
+    try { localStorage.setItem(ERR_KEY, JSON.stringify(list.slice(-5))); } catch (e) { return; }
+    touchDigest();
+  }
+  window.addEventListener('error', function (e) { recordError(e.message, String(e.filename || '').split('/').pop() + ':' + (e.lineno || 0)); });
+  window.addEventListener('unhandledrejection', function (e) { const r = e.reason; recordError(r && (r.message || r.code) || r, 'promise'); });
   function touchDigest() { clearTimeout(digestTimer); digestTimer = setTimeout(flushDigest, 2500); }
   async function flushDigest() {
     clearTimeout(digestTimer);
@@ -1528,6 +1544,7 @@ details.more { border-top: .5px solid var(--line); }
     next.answered = Object.keys(S.ls.states).reduce(function (n, id) { const st = S.ls.states[id]; return n + (st.correct || 0) + (st.wrong || 0); }, 0);
     next.dueCount = refreshIds().length;
     publishFriend();
+    next.errors = loadErrors();
     if (L.sameDigest(next, S.digest)) return;
     digestBusy = true;
     try { await S.db.doc('digest/' + S.uid).set(next); S.digest = next; }

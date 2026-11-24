@@ -103,7 +103,8 @@
     async function access() {
       const a = await db.doc('config/access').get();
       const d = a.exists ? (a.data() || {}) : {};
-      return { adminEmails: (d.adminEmails || []).map(norm), invited: (d.invited || []).map(norm), usage: d.usage || null };
+      return { adminEmails: (d.adminEmails || []).map(norm), invited: (d.invited || []).map(norm), usage: d.usage || null,
+        events: Array.isArray(d.events) ? d.events : [], eventsSeenAt: d.eventsSeenAt || '' };
     }
 
     async function gather() {
@@ -186,6 +187,7 @@
       const runAge = run && run.at ? Math.floor((Date.now() - Date.parse(run.at)) / 86400000) : null;
 
       const usage = window.LumenUsage ? window.LumenUsage.assess(g.acc.usage, rows.length) : null;
+      const unseen = g.acc.events.filter(function (e) { return !(g.acc.eventsSeenAt && e.at <= g.acc.eventsSeenAt); });
       const attention = [];
       if (usage && usage.verdict.level !== 'ok') attention.push({ level: usage.verdict.level, text: usage.verdict.title, link: link('usage') });
       else if (usage && usage.stale) attention.push({ level: 'info', text: usage.verdict.note, link: link('usage') });
@@ -211,6 +213,7 @@
         content: { factsUntil: factsUntil, daysLeft: daysLeft, lastRun: run ? { at: run.at || '', added: run.added || 0, notes: run.notes || '' } : null, newsDate: (run && run.newsDate) || '' },
         notice: { text: (g.pub.notice && g.pub.notice.text) || '', at: (g.pub.notice && g.pub.notice.at) || '' },
         usage: usage,
+        inbox: { unseen: unseen.length, latest: unseen.slice(-5).reverse() },
         attention: attention
       };
       cacheAt = Date.now();
@@ -257,6 +260,38 @@
       changed();
       return 'Zugang gesperrt.';
     }
+    /* ---------- the inbox: messages from anything in Lumen (hourly watcher, workflows, the dashboard itself) ---------- */
+    async function usage() {
+      guard();
+      const acc = await wrap(access());
+      return window.LumenUsage ? window.LumenUsage.assess(acc.usage, null) : null;
+    }
+    async function events(opts) {
+      guard();
+      const o = opts || {}, acc = await wrap(access());
+      let list = acc.events.map(function (e) { return Object.assign({}, e, { project: e.project || 'lumen', seen: !!(acc.eventsSeenAt && e.at <= acc.eventsSeenAt) }); });
+      if (o.since) list = list.filter(function (e) { return e.at > o.since; });
+      if (o.unseen) list = list.filter(function (e) { return !e.seen; });
+      return list.sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, o.limit || 60);
+    }
+    async function markSeen(at) {
+      guard();
+      await wrap(db.doc('config/access').set({ eventsSeenAt: at || new Date().toISOString() }, { merge: true }));
+      changed();
+      return 'Als gelesen markiert.';
+    }
+    async function send(e) {
+      guard();
+      const title = String((e && e.title) || '').trim().slice(0, 120);
+      if (!title) throw fail('bad-input');
+      const at = new Date().toISOString(), level = ['info', 'warn', 'alert'].indexOf(e.level) !== -1 ? e.level : 'info';
+      const item = { id: 'dashboard-' + Date.parse(at).toString(36), key: 'dashboard|' + title + '|' + at, at: at, level: level, project: 'lumen',
+        source: String(e.source || 'dashboard').slice(0, 30), title: title, text: String(e.text || '').slice(0, 400), link: String(e.link || '').slice(0, 300) };
+      const acc = await wrap(access());
+      await wrap(db.doc('config/access').set({ events: acc.events.concat([item]).slice(-60) }, { merge: true }));
+      changed();
+      return 'Meldung gespeichert.';
+    }
     const ACTIONS = [
       { id: 'notice', label: 'Mitteilung an alle', input: 'text', hint: 'Erscheint oben auf „Heute“, max. 400 Zeichen', run: setNotice },
       { id: 'clearNotice', label: 'Mitteilung entfernen', input: null, run: clearNotice },
@@ -283,6 +318,10 @@
       },
       signOut: function () { changed(); return auth.signOut(); },
       summary: summary,
+      usage: usage,
+      events: events,
+      markSeen: markSeen,
+      send: send,
       people: people,
       run: run,
       link: link

@@ -23,7 +23,8 @@ Anmeldung: Firebase Authentication (E-Mail und Passwort, Adresse muss bestätigt
 | `index.html` | Lernseite. Block `lumen-logic` = reine Logik (getestet), Block `lumen-app` = Oberfläche |
 | `admin.html` | Admin-Seite |
 | `lumen-connect.js`, `connect.json`, `CONNECT.md` | Anschluss für ein eigenes Dashboard: Zahlen lesen, alltägliche Admin-Aktionen, Sprung-Links in die Admin-Seite (`admin.html#people/<uid>` usw.). Beispiel: `dashboard-beispiel.html` |
-| `lumen-usage.js`, `tools/usage-report.mjs` | Tab „Auslastung“: misst stündlich (mit den Erinnerungen) die kostenlosen Grenzen und bewertet sie. Für die Lesezahlen braucht das Dienstkonto die Rolle „Monitoring-Betrachter“ |
+| `tools/notify.mjs`, `tools/fb-rest.mjs` | Meldungen ans Dashboard-Postfach (`node tools/notify.mjs warn "Titel" "Text"`), REST-Helfer für das Dienstkonto |
+| `lumen-usage.js`, `tools/usage-report.mjs` | Tab „Auslastung“: misst stündlich (mit den Erinnerungen) die kostenlosen Grenzen und bewertet sie; zugleich der Wächter, der Meldungen ans Postfach schickt. Für die Lesezahlen braucht das Dienstkonto die Rolle „Monitoring-Betrachter“ |
 | `lumen-cloud.js` | Anmeldung, Datenbank und Laden der Inhalte aus `data/`, von beiden Seiten genutzt |
 | `firebase-config.js` | Kennung des Firebase-Projekts (öffentlich, kein Geheimnis) |
 | `firestore.rules` | Zugriffsregeln, in der Firebase-Konsole veröffentlicht |
