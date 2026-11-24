@@ -23,3 +23,8 @@ jobs:
         continue-on-error: true
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+      # If the reminders broke, say so in the dashboard inbox.
+      - if: failure()
+        run: node tools/notify.mjs alert "Erinnerungen sind fehlgeschlagen" "Der Erinnerungs-Ablauf auf GitHub ist abgebrochen. Details unter Actions." "https://github.com/Kalyptooo/lumen/actions/workflows/reminders.yml" "erinnerungen"
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
