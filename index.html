@@ -455,7 +455,8 @@ details.more { border-top: .5px solid var(--line); }
 
 /* ---------- Du page ---------- */
 .tabs { grid-template-columns: repeat(4, 1fr); width: min(calc(100% - 24px), 25rem); }
-.main { overflow-x: hidden; }
+.main { overflow-x: hidden; touch-action: pan-y; }
+.view { will-change: transform; }
 .backbtn { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; min-height: 32px; margin: 0 0 2px -8px; padding: 0 8px 0 2px; border: 0; background: transparent; color: var(--brand); font-size: 1.0625rem; font-weight: 500; }
 .backbtn svg { width: 22px; height: 22px; stroke-width: 2.4; }
 .top .iconbtn svg { width: 22px; height: 22px; }
@@ -511,10 +512,10 @@ details.more { border-top: .5px solid var(--line); }
 
 /* ---------- Motion: short and light, never in the way. Off with Reduce Motion. ---------- */
 @media (prefers-reduced-motion: no-preference) {
-  .view.in-r { animation: in-r .22s cubic-bezier(.2, .8, .2, 1); }
-  .view.in-l { animation: in-l .22s cubic-bezier(.2, .8, .2, 1); }
-  @keyframes in-r { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
-  @keyframes in-l { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+  .view.in-r { animation: in-r .3s cubic-bezier(.2, .8, .2, 1); }
+  .view.in-l { animation: in-l .3s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes in-r { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+  @keyframes in-l { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
   .youpage.push { animation: push .26s cubic-bezier(.2, .8, .2, 1); }
   .youpage.pop { animation: pop-back .26s cubic-bezier(.2, .8, .2, 1); }
   @keyframes push { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
@@ -2907,27 +2908,76 @@ details.more { border-top: .5px solid var(--line); }
     if (!t || t.disabled || t.closest('.haptic, .hx')) return;
     tick('single');
   }, true);
-  /* Swipe left or right on the page to move between Heute, Üben and Archiv. */
+  /* Swipe left or right to move between the tabs (or back from a Du sub-page). The page follows the finger,
+     glides out when released far or fast enough, and springs back otherwise. */
   (function () {
     const order = ['today', 'practice', 'archive', 'you'];
-    let x0 = null, y0 = 0, t0 = 0;
-    $('main').addEventListener('touchstart', function (e) {
-      if (e.touches.length !== 1 || S.phase !== 'ready' || e.target.closest('.chips, input, textarea, .options')) { x0 = null; return; }
-      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
-    }, { passive: true });
-    $('main').addEventListener('touchend', function (e) {
-      if (x0 === null) return;
-      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
-      x0 = null;
-      if (Math.abs(dx) < 70 || Math.abs(dx) < 1.8 * Math.abs(dy) || Date.now() - t0 > 600) return;
-      if (S.tab === 'you' && S.youPage) { if (dx > 0) { tick('single'); openYou(null); } return; }
+    const ease = 'cubic-bezier(.2, .8, .2, 1)';
+    let g = null;
+    const viewEl = function () { return $(VIEWS.filter(function (p) { return p[0] === S.tab; })[0][1]); };
+    const target = function (dx) {
+      if (S.tab === 'you' && S.youPage) return dx > 0 ? 'back' : null;
       const i = order.indexOf(S.tab) + (dx < 0 ? 1 : -1);
-      if (i < 0 || i >= order.length) return;
-      S.tab = order[i];
-      tick('single');
-      render();
-      scrollTop();
+      return i >= 0 && i < order.length ? order[i] : null;
+    };
+    const clear = function (el) { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; };
+    $('main').addEventListener('touchstart', function (e) {
+      g = null;
+      if (e.touches.length !== 1 || S.phase !== 'ready' || S.sheets.length || e.target.closest('.chips, input, textarea, select, .options')) return;
+      g = { x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, lock: '', samples: [] };
     }, { passive: true });
+    $('main').addEventListener('touchmove', function (e) {
+      if (!g || g.lock === 'v') return;
+      const x = e.touches[0].clientX, dx = x - g.x0, dy = e.touches[0].clientY - g.y0;
+      if (!g.lock) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dx) < 1.3 * Math.abs(dy)) { g.lock = 'v'; return; }
+        g.lock = 'h';
+        g.el = viewEl();
+        g.x0 = x; g.width = $('main').clientWidth || 360;
+        if (motion()) g.el.style.transition = 'none';
+      }
+      const d = x - g.x0;
+      g.dx = d;
+      g.samples.push([Date.now(), d]);
+      if (g.samples.length > 5) g.samples.shift();
+      if (!motion()) return;
+      const shown = target(d) ? d : d * 0.25;
+      g.el.style.transform = 'translateX(' + shown + 'px)';
+      g.el.style.opacity = String(1 - Math.min(0.35, Math.abs(shown) / g.width * 0.6));
+    }, { passive: true });
+    const end = function () {
+      const s = g;
+      g = null;
+      if (!s || s.lock !== 'h') return;
+      const first = s.samples[0], last = s.samples[s.samples.length - 1];
+      const v = first && last && last[0] > first[0] ? (last[1] - first[1]) / (last[0] - first[0]) : 0;
+      const to = target(s.dx);
+      const go = !!to && (Math.abs(s.dx) > s.width * 0.3 || (Math.abs(s.dx) > 40 && Math.abs(v) > 0.35 && Math.sign(v) === Math.sign(s.dx)));
+      const el = s.el;
+      if (!go) {
+        if (!motion()) return;
+        el.style.transition = 'transform .3s ' + ease + ', opacity .3s ' + ease;
+        el.style.transform = '';
+        el.style.opacity = '';
+        setTimeout(function () { el.style.transition = ''; }, 320);
+        return;
+      }
+      tick('single');
+      const finish = function () {
+        clear(el);
+        if (to === 'back') openYou(null);
+        else { S.tab = to; render(); scrollTop(); }
+      };
+      if (!motion()) { finish(); return; }
+      const ms = Math.round(Math.max(110, Math.min(200, (s.width - Math.abs(s.dx)) / Math.max(0.8, Math.abs(v)))));
+      el.style.transition = 'transform ' + ms + 'ms ease-out, opacity ' + ms + 'ms ease-out';
+      el.style.transform = 'translateX(' + (Math.sign(s.dx) * s.width * 0.45) + 'px)';
+      el.style.opacity = '0';
+      setTimeout(finish, ms);
+    };
+    $('main').addEventListener('touchend', end, { passive: true });
+    $('main').addEventListener('touchcancel', end, { passive: true });
   })();
   let searchTimer = 0;
   $('archiveSearch').addEventListener('input', function (e) {
