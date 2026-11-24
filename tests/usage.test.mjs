@@ -1,6 +1,7 @@
 // Tests for lumen-usage.js (tab "Auslastung"). Run: node tests/usage.test.mjs
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { mergeEvents } from '../tools/notify.mjs';
 const U = createRequire(import.meta.url)('../lumen-usage.js');
 let n = 0;
 const test = (name, fn) => { fn(); n += 1; };
@@ -44,4 +45,16 @@ test('old measurement is flagged', () => {
   assert.ok(a.stale);
   assert.match(a.verdict.note, /10 Stunden/);
 });
-console.log(`Auslastung: ${n} Tests bestanden`);
+test('messages: no duplicates, newest 60 kept', () => {
+  const a = mergeEvents([], [{ level: 'warn', title: 'A', key: 'k1' }, { title: 'B', key: 'k1' }, { title: '' }], NOW);
+  assert.equal(a.added.length, 1);
+  assert.equal(a.events[0].level, 'warn');
+  const b = mergeEvents(a.events, [{ title: 'A again', key: 'k1' }, { title: 'C', key: 'k2', level: 'x' }], NOW);
+  assert.equal(b.added.length, 1);
+  assert.equal(b.added[0].level, 'info');
+  const many = Array.from({ length: 70 }, (_, i) => ({ title: 'T' + i, key: 'm' + i, at: new Date(NOW + i * 1000).toISOString() }));
+  const c = mergeEvents(b.events, many, NOW);
+  assert.equal(c.events.length, 60);
+  assert.equal(c.events[59].title, 'T69');
+});
+console.log(`Auslastung und Meldungen: ${n} Tests bestanden`);
