@@ -1890,6 +1890,7 @@ details.more { border-top: .5px solid var(--line); }
     else if (S.tab === 'archive') renderArchive();
     else renderYou();
     S.sheets.forEach(function (s) { if (s.live && !typingIn(s)) s.draw(); });
+    maybeAskPush();
   }
   const VIEWS = [['today', 'viewToday'], ['practice', 'viewPractice'], ['archive', 'viewArchive'], ['you', 'viewYou']];
   const motion = function () { return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); };
@@ -2514,11 +2515,38 @@ details.more { border-top: .5px solid var(--line); }
     if (!S.uid) return;
     S.db.doc('push/' + S.uid).set({ times: times(), counts: planCfg().counts, updatedAt: nowISO() }, { merge: true }).catch(function () {});
   }
+  /* First open from the home screen: ask once whether Lumen may remind. The answer is kept in the settings. */
+  let pushPrompted = false;
+  function maybeAskPush() {
+    if (pushPrompted || S.phase !== 'ready' || !standalone() || !('Notification' in window) || !('serviceWorker' in navigator)) return;
+    const st = settings();
+    if (st.push === true || st.pushAsked || Notification.permission === 'denied') return;
+    pushPrompted = true;
+    setTimeout(function () { if (S.sheets.length) pushPrompted = false; else openPushAsk(); }, 900);
+  }
+  function openPushAsk() {
+    const t = times(), c = planCfg();
+    const when = L.BLOCKS.filter(function (b) { return c.counts[b] > 0; }).map(function (b) { return t[b]; }).join(', ') + ' Uhr';
+    const sheet = openSheet('Erinnerungen', function () {
+      return [
+        h('div', { class: 'section' },
+          h('p', { class: 'text', text: 'Soll Lumen dich erinnern, wenn noch Fakten auf dich warten?' }),
+          h('p', { class: 'hint', text: 'Um ' + when + ', aber nur, wenn die Etappe noch offen ist. Höchstens eine Erinnerung pro Etappe. Du kannst das jederzeit unter Du → Einstellungen ändern.' })),
+        btn(pushBusy ? 'Einen Moment …' : 'Ja, erinnere mich', 'primary', function () {
+          enablePush(function () { sheet.draw(); }).then(function () { closeSheet(sheet); });
+        }, pushBusy),
+        btn('Nein, danke', 'secondary', function () { closeSheet(sheet); })
+      ];
+    });
+    sheet.onclose = function () { writePriv('settings', { pushAsked: true }); };
+  }
   async function enablePush(redraw) {
     if (pushBusy) return;
     pushBusy = true; redraw();
     try {
       if (!('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
+      /* Ask right away, before anything is loaded: iOS only shows the question during the tap itself. */
+      const asked = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
       if (!C.messaging) {
         await new Promise(function (resolve, reject) {
           const sc = document.createElement('script');
@@ -2532,7 +2560,7 @@ details.more { border-top: .5px solid var(--line); }
         } catch (e) { C.messaging = null; }
         if (!C.messaging) throw new Error('unsupported');
       }
-      const perm = await Notification.requestPermission();
+      const perm = await asked;
       if (perm !== 'granted') { toast('Ohne deine Erlaubnis kann Lumen nicht erinnern. Du kannst sie in den iPhone-Einstellungen bei Lumen erteilen.'); pushBusy = false; redraw(); return; }
       const reg = await navigator.serviceWorker.ready;
       const token = await C.messaging.getToken({ vapidKey: self.LUMEN_VAPID, serviceWorkerRegistration: reg });
