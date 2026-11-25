@@ -368,6 +368,13 @@ details.more > div { display: flex; flex-direction: column; gap: 12px; padding-t
 }
 .welcome { display: flex; align-items: center; gap: 14px; }
 .welcome img { width: 56px; height: 56px; border-radius: 14px; flex: none; }
+.installsteps { list-style: none; margin: 20px 0 4px; padding: 0; counter-reset: st; display: grid; gap: 16px; }
+.installsteps li { counter-increment: st; display: flex; gap: 12px; align-items: flex-start; line-height: 1.5; }
+.installsteps li::before { content: counter(st); flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: .875rem; display: grid; place-items: center; }
+.installsteps strong { font-weight: 600; }
+.sym { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 24px; padding: 0 6px; margin: 0 1px; border-radius: 7px; background: var(--surface-2); vertical-align: middle; font-weight: 700; line-height: 1; }
+.sym svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.installsteps + .btn, .installsteps + .hint { margin-top: 20px; }
 .skeleton i { display: block; height: 14px; border-radius: 7px; background: var(--surface-2); }
 .skeleton i.big { height: 26px; margin-bottom: 6px; }
 @media (prefers-reduced-motion: no-preference) { .skeleton i { animation: pulse 1.2s ease-in-out infinite alternate; } @keyframes pulse { to { opacity: .45; } } }
@@ -1562,6 +1569,12 @@ details.more { border-top: .5px solid var(--line); }
   /* ---------- loading ---------- */
 
   function boot() {
+    if (mustInstall()) {
+      try { S.installFirst = !localStorage.getItem('lumen-install-seen'); localStorage.setItem('lumen-install-seen', '1'); } catch (e) { S.installFirst = true; }
+      S.phase = 'install';
+      render();
+      return;
+    }
     render();
     if (!C || !C.ready) { S.phase = 'error'; render(); return; }
     C.auth.onAuthStateChanged(onAuth);
@@ -1971,7 +1984,7 @@ details.more { border-top: .5px solid var(--line); }
     setTitle(sub ? YOU_PAGES[S.youPage] : (titles[S.tab] || 'Lumen'));
     $('btnBack').hidden = !sub;
     $('statusLine').textContent = line;
-    const outside = S.phase === 'signin' || S.phase === 'verify' || S.phase === 'denied';
+    const outside = S.phase === 'signin' || S.phase === 'verify' || S.phase === 'denied' || S.phase === 'install';
     document.querySelector('.tabs').hidden = outside;
     headerButton(sub);
     if (outside) S.tab = 'today';
@@ -2022,6 +2035,7 @@ details.more { border-top: .5px solid var(--line); }
   }
   function stateCard() {
     if (S.phase === 'signin') { $('viewTitle').textContent = ''; $('statusLine').textContent = ''; return authCard(); }
+    if (S.phase === 'install') { $('viewTitle').textContent = ''; $('statusLine').textContent = ''; return installCard(); }
     if (S.phase === 'verify') return verifyCard();
     if (S.phase === 'denied') return deniedCard();
     if (S.phase === 'error') {
@@ -2613,6 +2627,103 @@ details.more { border-top: .5px solid var(--line); }
   /* ---------- reminders (web push) ---------- */
 
   const standalone = function () { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; };
+  /* ---------- phones: Lumen runs only from the home screen ----------
+     On a phone in the browser Lumen shows a short guide for exactly this phone and browser instead of the app.
+     Tablets and computers may use the browser. The admin page has no such check.
+     In the local preview (fake cloud) ?ua=... stands in for the phone's browser identification. */
+  const installed = function () {
+    return standalone() || ['fullscreen', 'minimal-ui'].some(function (m) { return window.matchMedia && window.matchMedia('(display-mode: ' + m + ')').matches; });
+  };
+  function device() {
+    const ua = (C && C.fake && new URLSearchParams(location.search).get('ua')) || navigator.userAgent || '';
+    const ios = /iPhone|iPod/.test(ua), android = /Android/.test(ua) && /Mobile/.test(ua);
+    // Since iOS 26 Safari reports "OS 18_6" but "Version/26"; take the larger number.
+    const v = [ua.match(/OS (\d+)_/), ua.match(/Version\/(\d+)/)].reduce(function (n, m) { return m ? Math.max(n, Number(m[1])) : n; }, 0);
+    let browser = 'other';
+    if (/FBAN|FBAV|FB_IAB|Instagram|Snapchat|TikTok|musical_ly|LinkedInApp|Pinterest|Line\/|GSA\/|; wv\)/.test(ua)) browser = 'inapp';
+    else if (ios) browser = /CriOS/.test(ua) ? 'chrome' : /FxiOS/.test(ua) ? 'firefox' : /EdgiOS/.test(ua) ? 'edge' : /Safari\//.test(ua) ? 'safari' : 'inapp';
+    else if (android) browser = /SamsungBrowser/.test(ua) ? 'samsung' : /Firefox\//.test(ua) ? 'firefox' : /EdgA\//.test(ua) ? 'edge' : /OPR\/|Opera/.test(ua) ? 'opera' : /Chrome\//.test(ua) ? 'chrome' : 'other';
+    return { phone: ios || android, ios: ios, android: android, iosMajor: v, browser: browser };
+  }
+  const mustInstall = function () { return device().phone && !installed(); };
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    if (!mustInstall()) return;
+    e.preventDefault();
+    installPrompt = e;
+    if (S.phase === 'install') render();
+  });
+  window.addEventListener('appinstalled', function () { installPrompt = null; S.installDone = true; if (S.phase === 'install') render(); });
+  const SYM = {
+    share: svg('<path d="M12 3v12M8 7l4-4 4 4"/><path d="M8 10H6.5A1.5 1.5 0 0 0 5 11.5v8A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-8a1.5 1.5 0 0 0-1.5-1.5H16"/>'),
+    add: svg('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>')
+  };
+  function installCard() {
+    const d = device(), home = d.ios ? 'Home-Bildschirm' : 'Startbildschirm';
+    const sym = function (s) { return h('span', { class: 'sym', html: SYM[s] || null, text: SYM[s] ? null : s, 'aria-hidden': 'true' }); };
+    const b = function (t) { return h('strong', { text: '„' + t + '“' }); };
+    const step = function () { return h('li', {}, h('span', {}, Array.prototype.slice.call(arguments))); };
+    const head = function (title, lead) {
+      return [h('div', { class: 'welcome' }, h('img', { src: 'icon.svg', alt: '', width: '56', height: '56' }), h('h2', { class: 'title', text: title })),
+        lead ? h('p', { class: 'lead', style: 'margin-top:14px', text: lead }) : null];
+    };
+    if (S.installDone) {
+      return h('div', { class: 'card' }, head('Fertig!', 'Lumen ist jetzt auf deinem ' + home + '. Schließ den Browser und öffne Lumen über das Glühbirnen-Symbol.'));
+    }
+    const link = location.origin + location.pathname;
+    const copy = function () {
+      const done = function () { toast('Link kopiert.'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, function () { toast(link); });
+      else toast(link);
+    };
+    const finish = step('Öffne Lumen ab jetzt über das neue Glühbirnen-Symbol auf deinem ' + home + '.' + (d.ios ? ' Dort meldest du dich einmal an.' : ''));
+    let steps = [], extra = null;
+    if (d.browser === 'inapp') {
+      const other = d.ios ? 'Safari' : 'Chrome';
+      steps = [step('Du bist gerade im Browser einer anderen App. Von hier aus geht es nicht. Kopiere zuerst den Link mit dem Knopf unten.'),
+        step('Öffne ', h('strong', { text: other }), ', tippe oben in die Adresszeile, füge den Link ein und öffne ihn.'),
+        step('Dort zeigt dir Lumen die nächsten Schritte.')];
+      extra = btn('Link kopieren', 'primary', copy);
+    } else if (d.ios) {
+      const first = d.browser === 'chrome' ? step('Tippe oben rechts in der Adresszeile auf ', sym('share'), '.')
+        : d.browser === 'firefox' ? step('Tippe unten rechts auf ', sym('☰'), ' und dann auf ', b('Teilen'), '.')
+        : d.browser === 'edge' ? step('Tippe unten auf ', sym('•••'), ' und dann auf ', b('Teilen'), '.')
+        : d.iosMajor >= 26 ? step('Tippe unten rechts auf ', sym('•••'), ' und dann auf ', sym('share'), ' ', b('Teilen'), '.')
+        : step('Tippe unten in der Leiste auf ', sym('share'), '. Siehst du die Leiste nicht, tippe kurz auf den unteren Rand.');
+      steps = [first, step('Scroll in der Liste etwas nach unten und tippe auf ', b('Zum Home-Bildschirm'), ' ', sym('add'), '.'),
+        d.iosMajor >= 26 ? step('Lass ', b('Als Web-App öffnen'), ' eingeschaltet und tippe oben rechts auf ', b('Hinzufügen'), '.')
+          : step('Tippe oben rechts auf ', b('Hinzufügen'), '.'),
+        finish];
+    } else {
+      if (installPrompt) {
+        steps = [step('Tippe unten auf ', b('Lumen installieren'), ' und bestätige mit ', b('Installieren'), '.'), finish];
+        extra = btn('Lumen installieren', 'primary', function () {
+          const p = installPrompt;
+          if (!p) return;
+          p.prompt();
+          p.userChoice.then(function (c) { if (c && c.outcome === 'accepted') { installPrompt = null; S.installDone = true; render(); } }).catch(function () {});
+        });
+      } else if (d.browser === 'samsung') {
+        steps = [step('Tippe unten rechts auf ', sym('≡'), '.'), step('Tippe auf ', b('Seite hinzufügen zu'), ' und dann auf ', b('Startbildschirm'), '.'),
+          step('Tippe auf ', b('Hinzufügen'), '.'), finish];
+      } else if (d.browser === 'chrome' || d.browser === 'firefox' || d.browser === 'edge') {
+        steps = [step('Tippe ' + (d.browser === 'edge' ? 'unten' : 'oben') + ' rechts auf ', sym(d.browser === 'edge' ? '•••' : '⋮'), '.'),
+          step('Tippe auf ', b('Zum Startbildschirm hinzufügen'), ' (manchmal heißt es ', b('App installieren'), ').'),
+          step('Bestätige mit ', b('Installieren'), ' oder ', b('Hinzufügen'), '.'), finish];
+      } else {
+        steps = [step('Öffne das Menü deines Browsers (', sym('⋮'), ' oder ', sym('≡'), ').'),
+          step('Such nach ', b('Zum Startbildschirm hinzufügen'), ' oder ', b('App installieren'), '.'),
+          step('Bestätige mit ', b('Hinzufügen'), '.'), finish];
+        extra = h('p', { class: 'hint', text: 'Klappt es nicht? Mit Chrome geht es am einfachsten.' });
+      }
+    }
+    if (d.ios && d.browser !== 'safari' && d.browser !== 'inapp') extra = h('p', { class: 'hint', text: 'Klappt es nicht? Öffne den Link in Safari, dort geht es sicher.' });
+    const lead = S.installFirst
+      ? 'Auf dem Handy holst du dir Lumen auf den ' + home + '. Das dauert eine halbe Minute und geht ohne App Store. Danach startet Lumen wie eine App und kann dich erinnern.'
+      : 'Auf dem Handy läuft Lumen nur über das Symbol auf deinem ' + home + '. Schon hinzugefügt? Dann öffne es von dort. Sonst so:';
+    return h('div', { class: 'card' }, head(S.installFirst ? 'Willkommen bei Lumen' : 'Öffne Lumen vom ' + home, lead),
+      h('ol', { class: 'installsteps' }, steps), extra);
+  }
   let pushBusy = false;
   function savePushTimes() {
     if (!S.uid) return;
