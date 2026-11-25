@@ -143,6 +143,33 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
 .usage-verdict.warn { border-left-color: var(--warn); } .usage-verdict.alert { border-left-color: var(--danger); }
 .usage-free { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
 .usage-free li { display: flex; flex-direction: column; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { min-height: 36px; padding: 4px 14px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .875rem; cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 650; }
+.left { font-size: .8125rem; color: var(--muted); margin-top: 4px; }
+.left.soon { color: var(--text); }
+.left.warn { color: var(--warn); font-weight: 600; }
+.leftline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.leftline .left { margin: 0; font-size: .9375rem; }
+.section-title { font-size: 1.25rem; font-weight: 750; margin: 10px 4px -4px; }
+.todo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.todo + .todo { border-top: .5px solid var(--line); padding-top: 12px; }
+.modal { position: fixed; inset: 0; z-index: 8; background: rgba(0, 0, 0, .45); display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 32px 16px; }
+.sheet { width: 100%; max-width: 46rem; background: var(--bg); border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.sheet section { background: var(--surface); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.sheet h3 { font-size: 1rem; }
+.sheethead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.sheethead h2 { font-size: 1.375rem; }
+.sheet .kpi { background: var(--surface-2); }
+details > summary { cursor: pointer; font-weight: 600; min-height: 36px; display: flex; align-items: center; }
+details.more { padding: 0 4px; }
+details.more .row { margin-top: 8px; }
+body.modal-open { overflow: hidden; }
+@media (max-width: 40rem) {
+  .modal { padding: 0; }
+  .sheet { border-radius: 0; min-height: 100%; padding: max(14px, calc(env(safe-area-inset-top, 0px) + 10px)) 14px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+  .todo { flex-wrap: wrap; }
+}
 .usage-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 </style>
 </head>
@@ -170,12 +197,12 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
   const AREA_NAME = {};
   AREAS.forEach(function (a) { AREA_NAME[a[0]] = a[1]; });
   const DEFAULT_TIMES = { morgen: '07:00', mittag: '12:00', abend: '18:00' };
-  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['settings', 'Für alle'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['weekly', 'Wochenaufgabe'], ['usage', 'Auslastung'], ['billing', 'Monetarisierung']];
+  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['settings', 'Einstellungen'], ['system', 'System']];
   const B = window.LumenBilling;
   const S = {
     phase: 'boot', user: null, tab: 'overview', access: null, pub: null, members: {}, digests: {}, manifest: null,
     form: { email: '', password: '', error: '', busy: false }, titles: {}, weights: null, wish: null, busy: false,
-    sel: null, bills: {}, billCfg: {}, billSel: null, billForm: null, cfgForm: null, sort: 'lastSeen', day: null, dayDoc: null, edit: null, runs: null, newsList: null, notice: '', times: null
+    sel: null, bills: {}, billCfg: {}, group: 'all', billForm: null, cfgForm: null, sort: 'access', day: null, dayDoc: null, edit: null, runs: null, newsList: null, notice: '', times: null
   };
   const $ = function (id) { return document.getElementById(id); };
   function h(tag, attrs) {
@@ -379,14 +406,36 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     if (isAdminEmail(m.email)) return { state: 'admin' };
     return B.access(S.bills[uid] || null, Date.now(), todayVienna());
   }
-  const STATE_TEXT = { none: 'noch nicht da gewesen', admin: 'Admin, immer frei', trial: 'Gratis-Zeit', trialOver: 'Gratis-Zeit vorbei', open: 'freigeschaltet', locked: 'gesperrt' };
+  const STATE_TEXT = { none: 'Neu', admin: 'Admin', trial: 'Gratis-Zeit', trialOver: 'Gratis-Zeit vorbei', open: 'Freigeschaltet', locked: 'Gesperrt' };
   function stateTag(a) {
+    if (a.state === 'open' && a.dueIn !== null && a.dueIn < 0) return h('span', { class: 'tag warn', text: 'Zahlung offen' });
     const cls = a.state === 'trialOver' || a.state === 'locked' ? 'tag warn' : a.state === 'open' || a.state === 'admin' ? 'tag ok' : 'tag';
-    let text = STATE_TEXT[a.state];
-    if (a.state === 'trial') text += a.hoursLeft > 24 ? ', noch ' + Math.ceil(a.hoursLeft / 24) + ' Tage' : ', endet heute';
-    if (a.state === 'open' && a.dueIn !== null && a.dueIn < 0) return h('span', { class: 'tag warn', text: 'offen seit ' + fmtDay(a.due) });
-    return h('span', { class: cls, text: text });
+    return h('span', { class: cls, text: STATE_TEXT[a.state] });
   }
+  /* How long the current state lasts. Shown for everyone in the list, without opening the person. */
+  function accessLeft(a, b) {
+    const span = function (hours) {
+      if (hours < 1) return 'noch unter 1 Std.';
+      if (hours < 48) return 'noch ' + Math.floor(hours) + ' Std.';
+      const d = Math.floor(hours / 24);
+      return 'noch ' + d + (d === 1 ? ' Tag' : ' Tage');
+    };
+    const at = function (t) { return new Date(t).toLocaleString('de-AT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' }) + ' Uhr'; };
+    const days = function (n) { return n + (n === 1 ? ' Tag' : ' Tage'); };
+    if (a.state === 'admin') return { text: 'unbegrenzt', level: '' };
+    if (a.state === 'none') return { text: 'Gratis-Zeit startet beim ersten Öffnen', level: '' };
+    if (a.state === 'trial') return { text: (a.end ? 'gratis bis ' + at(a.end) + ' · ' : '') + span(a.hoursLeft), level: a.hoursLeft <= 24 ? 'warn' : '' };
+    if (a.state === 'trialOver') return { text: 'abgelaufen' + (a.end ? ' am ' + at(a.end) : '') + ' · App gesperrt', level: 'warn' };
+    if (a.state === 'locked') return { text: 'kein Zugang' + (b.lockedAt ? ' seit ' + fmtDay(b.lockedAt) : ''), level: '' };
+    if (a.state === 'open') {
+      if (!a.due) return { text: 'unbegrenzt, kein Zahltag eingetragen', level: '' };
+      if (a.dueIn > 0) return { text: 'bezahlt bis ' + fmtDay(a.due) + ' · noch ' + days(a.dueIn), level: a.dueIn <= B.WARN_DAYS ? 'soon' : '' };
+      if (a.dueIn === 0) return { text: 'Zahltag heute', level: 'warn' };
+      return { text: 'Zahltag war ' + fmtDay(a.due) + ' · seit ' + days(-a.dueIn) + ' offen', level: 'warn' };
+    }
+    return { text: '', level: '' };
+  }
+  const needsYou = function (a) { return a.state === 'trialOver' || (a.state === 'open' && a.dueIn !== null && a.dueIn <= 0); };
   /* Admins are never locked: their record says so (also for the app, which cannot read the admin list). */
   function markAdmins() {
     Object.keys(S.members).forEach(function (uid) {
@@ -417,52 +466,18 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
   }
   const personName = function (uid) { const m = S.members[uid] || {}, d = S.digests[uid] || {}; return m.name || d.name || m.email || 'Unbekannt'; };
 
-  function billing() {
-    const t = todayVienna();
-    const ids = Object.keys(Object.assign({}, S.members, S.bills)).filter(function (uid) { return S.members[uid] || !S.bills[uid].admin; });
-    const rows = ids.map(function (uid) { return { uid: uid, a: billState(uid), b: S.bills[uid] || {} }; });
-    const order = { trialOver: 0, open: 1, trial: 2, locked: 3, none: 4, admin: 5 };
-    rows.sort(function (x, y) {
-      const late = function (r) { return r.a.state === 'open' && r.a.dueIn !== null && r.a.dueIn < 0 ? -1 : 0; };
-      return (late(x) - late(y)) || (order[x.a.state] - order[y.a.state]) || personName(x.uid).localeCompare(personName(y.uid), 'de');
-    });
-    const count = function (st) { return rows.filter(function (r) { return r.a.state === st; }).length; };
-    const monthly = rows.filter(function (r) { return r.a.state === 'open'; }).reduce(function (n, r) { return n + (Number(r.b.amount) || 0); }, 0);
-    const lateRows = rows.filter(function (r) { return r.a.state === 'open' && r.a.dueIn !== null && r.a.dueIn < 0; });
-    const sel = S.billSel && (S.members[S.billSel] || S.bills[S.billSel]) ? S.billSel : null;
-    return [
-      h('div', { class: 'kpis' }, kpi(count('trialOver'), 'warten auf Freischaltung'), kpi(count('trial'), 'in der Gratis-Zeit'), kpi(count('open'), 'freigeschaltet'),
-        kpi(count('locked'), 'gesperrt'), kpi(B.euro(monthly), 'pro Monat (freigeschaltete)'), kpi(lateRows.length, 'Zahlung offen')),
-      sel ? billCard(sel) : null,
-      h('div', { class: 'card' }, h('h2', { text: 'Personen' }),
-        rows.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'click' },
-          h('thead', {}, h('tr', {}, h('th', { text: 'Name' }), h('th', { text: 'Stand' }), h('th', { class: 'num', text: 'Betrag' }), h('th', { class: 'num hide-sm', text: 'Nächster Zahltag' }))),
-          h('tbody', {}, rows.map(function (r) {
-            const m = S.members[r.uid] || {};
-            return h('tr', { class: sel === r.uid ? 'sel' : null, tabindex: '0', onclick: function () { S.billSel = S.billSel === r.uid ? null : r.uid; S.billForm = null; setHash(); render(); window.scrollTo(0, 0); },
-              onkeydown: function (e) { if (e.key === 'Enter') { S.billSel = r.uid; S.billForm = null; render(); } } },
-              h('td', {}, h('strong', { text: personName(r.uid) }), m.email && m.name ? h('div', { class: 'hint', text: m.email }) : null),
-              h('td', {}, stateTag(r.a)),
-              h('td', { class: 'num', text: r.a.state === 'open' && r.b.amount ? B.euro(r.b.amount) : '–' }),
-              h('td', { class: 'num hide-sm', text: r.a.state === 'open' && r.b.nextPay ? fmtDay(r.b.nextPay) : '–' }));
-          })))) : h('p', { class: 'muted', text: 'Noch niemand da.' }),
-        h('p', { class: 'hint', text: 'Auf eine Zeile tippen zum Freischalten, Bezahlt-Markieren oder Sperren. Neue Personen haben zuerst ' + cfgTrialDays() + ' Tage gratis; danach sperrt die App von selbst, bis du freischaltest. Wer freigeschaltet ist, wird nie automatisch gesperrt.' })),
-      settingsCard(t)
-    ];
-  }
   const cfgTrialDays = function () { return Number.isInteger(S.billCfg.trialDays) ? S.billCfg.trialDays : B.TRIAL_DAYS; };
 
-  function billCard(uid) {
+  /* Access and payment of one person (inside the person window). */
+  function accessSection(uid) {
     const a = billState(uid), b = S.bills[uid] || {}, m = S.members[uid] || {}, t = todayVienna();
     const name = personName(uid);
+    if (a.state === 'admin') return h('p', { class: 'muted', text: 'Admins sind immer freigeschaltet und zahlen nichts.' });
     if (!S.billForm || S.billForm.uid !== uid) {
       S.billForm = { uid: uid, amount: b.amount ? String(b.amount) : '', nextPay: b.nextPay || B.nextMonth(t), remindPush: b.remindPush !== false, remindEmail: !!b.remindEmail,
         message: b.message || '', lockOpen: false };
     }
     const F = S.billForm;
-    const head = h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: name }),
-      btn('Schließen', 'secondary small', function () { S.billSel = null; S.billForm = null; setHash(); render(); }));
-    if (a.state === 'admin') return h('div', { class: 'card' }, head, h('p', { class: 'muted', text: 'Admins sind immer freigeschaltet und zahlen nichts.' }));
     const amountIn = h('input', { type: 'number', min: '0', step: '0.5', inputmode: 'decimal', value: F.amount, oninput: function (e) { F.amount = e.target.value; } });
     const dateIn = h('input', { type: 'date', value: F.nextPay, oninput: function (e) { F.nextPay = e.target.value; } });
     const check = function (label, key, disabled) {
@@ -490,24 +505,23 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
         }, S.busy),
         btn('Abbrechen', 'secondary', function () { F.lockOpen = false; render(); })));
     const lockButton = btn('Zugang sperren …', 'secondary', function () { F.lockOpen = true; render(); }, S.busy);
-    const info = [];
-    if (a.state === 'trial') info.push(h('p', { text: 'Ist in der Gratis-Zeit, ' + (a.hoursLeft > 24 ? 'noch ' + Math.ceil(a.hoursLeft / 24) + ' Tage.' : 'endet heute.') }));
+    const left = accessLeft(a, b);
+    const info = [h('div', { class: 'leftline' }, stateTag(a), h('span', { class: 'left' + (left.level ? ' ' + left.level : ''), text: left.text }))];
     if (a.state === 'trialOver') info.push(h('p', { text: 'Die Gratis-Zeit ist vorbei. Die App ist gesperrt, bis du freischaltest.' }));
     if (a.state === 'none') info.push(h('p', { text: 'War seit dem Start des Bezahlsystems noch nicht in der App. Die Gratis-Zeit beginnt beim nächsten Öffnen. Du kannst auch gleich freischalten.' }));
-    if (a.state === 'locked') info.push(h('p', { text: 'Ist gesperrt' + (b.lockedAt ? ' seit ' + fmtDay(b.lockedAt) : '') + '.' }), b.message ? h('p', { class: 'hint', text: 'Nachricht: ' + b.message }) : null);
+    if (a.state === 'locked' && b.message) info.push(h('p', { class: 'hint', text: 'Nachricht: ' + b.message }));
     if (a.state === 'open') {
       info.push(h('div', { class: 'kpis' }, kpi(B.euro(b.amount || 0), 'pro Monat'), kpi(b.nextPay ? fmtDay(b.nextPay) : '–', 'nächster Zahltag'),
         kpi(b.paidAt ? fmtDay(b.paidAt) : '–', 'zuletzt bezahlt')));
-      if (a.dueIn !== null && a.dueIn < 0) info.push(h('p', { class: 'warn', text: 'Die Zahlung ist seit ' + (-a.dueIn) + (a.dueIn === -1 ? ' Tag' : ' Tagen') + ' offen.' }));
     }
     const ref = B.reference(m.name, m.email);
-    return h('div', { class: 'card person' }, head, m.email ? h('p', { class: 'hint', text: m.email + ' · Verwendungszweck: ' + ref }) : null, info,
+    return [info, m.email ? h('p', { class: 'hint', text: 'Verwendungszweck für die Überweisung: ' + ref }) : null,
       a.state === 'open' ? [
         h('div', { class: 'row' },
           btn('Zahlung erhalten', 'primary', function () {
             const next = B.afterPayment(b, todayVienna());
             if (!window.confirm('Zahlung von ' + name + ' erhalten? Der nächste Zahltag wird der ' + fmtDay(next, true) + '.')) return;
-            saveBill(uid, { nextPay: next, paidAt: nowISO() }, 'Bezahlt. Nächster Zahltag: ' + fmtDay(next) + '.');
+            saveBill(uid, { nextPay: next, paidAt: nowISO() }, 'Bezahlt. Nächster Zahltag: ' + fmtDay(next, true) + '.');
           }, S.busy),
           F.lockOpen ? null : lockButton),
         F.lockOpen ? lockArea : null,
@@ -529,7 +543,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
         F.lockOpen ? lockArea : null,
         a.state === 'locked' ? h('details', {}, h('summary', { text: 'Nachricht ändern' }), h('div', { class: 'stack' }, msgBox,
           btn('Nachricht speichern', 'secondary', function () { saveBill(uid, { message: F.message.trim().slice(0, 400) }, 'Nachricht gespeichert.'); }, S.busy))) : null
-      ]);
+      ]];
   }
 
   function settingsCard() {
@@ -538,7 +552,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     const text = function (label, key, type, ph) {
       return h('label', { class: 'field' }, h('span', { text: label }), h('input', { type: type || 'text', value: F[key], placeholder: ph || '', oninput: function (e) { F[key] = e.target.value; } }));
     };
-    return h('div', { class: 'card' }, h('h2', { text: 'Einstellungen' }),
+    return h('div', { class: 'card' }, h('h2', { text: 'Gratis-Zeit, Kontakt und Bankdaten' }),
       h('div', { class: 'grid2' },
         text('Gratis-Tage für neue Personen', 'trialDays', 'number'),
         text('Kontakt-E-Mail (für Gesperrte sichtbar)', 'contactEmail', 'email', 'leer lassen = nur persönlich')),
@@ -574,23 +588,40 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
         admin: S.access.adminEmails.indexOf(email) !== -1, invited: B.usable(billState(uid)) };
     });
   }
-  function sortedRows() {
-    const rows = personRows(), k = S.sort;
-    return rows.sort(function (a, b) {
-      if (k === 'name') return (a.name || a.email).localeCompare(b.name || b.email, 'de');
-      const x = a[k], y = b[k];
-      if (x === y) return 0;
-      if (x === null || x === undefined || x === '') return 1;
-      if (y === null || y === undefined || y === '') return -1;
-      return x < y ? 1 : -1;
+  /* Everyone in one list: learning progress plus access state and how long it lasts. */
+  function allPeople() {
+    const base = {};
+    personRows().forEach(function (r) { base[r.uid] = r; });
+    Object.keys(S.bills).forEach(function (uid) {
+      if (!base[uid] && !S.bills[uid].admin) base[uid] = { uid: uid, name: '', email: '', lastSeen: '', streak: 0, learned: 0, answered: 0, pct: null, reports: 0, known: 0, due: 0, start: '', active: [], admin: false, invited: false };
+    });
+    return Object.keys(base).map(function (uid) {
+      const a = billState(uid), b = S.bills[uid] || {};
+      return Object.assign({}, base[uid], { a: a, b: b, left: accessLeft(a, b), todo: needsYou(a) });
     });
   }
+  function peopleOrder(k) {
+    const rank = function (r) { return r.todo ? 0 : ({ trial: 1, open: 2, none: 3, locked: 4, trialOver: 4, admin: 5 })[r.a.state] || 6; };
+    const soon = function (r) { return r.a.state === 'trial' ? r.a.hoursLeft / 24 : r.a.state === 'open' && r.a.dueIn !== null ? r.a.dueIn : 99999; };
+    const nm = function (r) { return r.name || r.email || ''; };
+    const byName = function (x, y) { return nm(x).localeCompare(nm(y), 'de'); };
+    return function (x, y) {
+      if (k === 'name') return byName(x, y);
+      if (k === 'access') return (rank(x) - rank(y)) || (soon(x) - soon(y)) || byName(x, y);
+      const v = function (r) { return k === 'amount' ? (r.a.state === 'open' ? Number(r.b.amount) || 0 : '') : r[k]; };
+      const p = v(x), q = v(y);
+      if (p === q) return byName(x, y);
+      if (p === null || p === undefined || p === '') return 1;
+      if (q === null || q === undefined || q === '') return -1;
+      return p < q ? 1 : -1;
+    };
+  }
   function exportCsv() {
-    const rows = sortedRows();
-    const head = ['Name', 'E-Mail', 'Start', 'Zuletzt da', 'Serie', 'Gelernt', 'Antworten', 'Richtig %', 'Bekannt', 'Fällig', 'Meldungen', 'Aktive Tage (30)'];
+    const rows = allPeople().sort(peopleOrder('name'));
+    const head = ['Name', 'E-Mail', 'Zugang', 'Wie lange noch', 'Betrag pro Monat', 'Start', 'Zuletzt da', 'Serie', 'Gelernt', 'Antworten', 'Richtig %', 'Bekannt', 'Fällig', 'Meldungen', 'Aktive Tage (30)'];
     const esc = function (v) { const s = v === null || v === undefined ? '' : String(v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const lines = [head.join(';')].concat(rows.map(function (r) {
-      return [r.name, r.email, r.start, r.lastSeen, r.streak, r.learned, r.answered, r.pct, r.known, r.due, r.reports, r.active.length].map(esc).join(';');
+      return [r.name, r.email, STATE_TEXT[r.a.state], r.left.text, r.a.state === 'open' ? r.b.amount || 0 : '', r.start, r.lastSeen, r.streak, r.learned, r.answered, r.pct, r.known, r.due, r.reports, r.active.length].map(esc).join(';');
     }));
     const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
     const a = h('a', { href: url, download: 'lumen-personen-' + todayVienna() + '.csv', style: 'display:none' });
@@ -614,10 +645,13 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     const open = allReports().filter(function (r) { return !handled(r); }).length;
     root.appendChild(h('div', { class: 'tabs', role: 'group', 'aria-label': 'Bereich' },
       TABS.map(function (t) {
-        return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; setHash(); render(); } });
+        return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; S.sel = null; S.billForm = null; setHash(); render(); } });
       })));
-    const view = { overview: overview, people: people, settings: forAll, facts: facts, reports: reports, weekly: weekly, usage: usageView, billing: billing }[S.tab];
+    const view = { overview: overview, people: people, settings: settingsTab, facts: facts, reports: reports, system: systemTab }[S.tab];
     add(root, view());
+    const modal = S.tab === 'people' && S.sel ? personModal(S.sel) : null;
+    add(root, modal);
+    document.body.classList.toggle('modal-open', !!modal);
   }
   function signinCard() {
     const F = S.form;
@@ -656,25 +690,32 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
       });
     });
     const maxRead = Math.max.apply(null, AREAS.map(function (a) { return agg[a[0]].read; }).concat([1]));
+    const ppl = allPeople();
+    const monthly = ppl.filter(function (r) { return r.a.state === 'open'; }).reduce(function (n, r) { return n + (Number(r.b.amount) || 0); }, 0);
     const idle = rows.filter(function (r) { return r.invited && r.lastSeen && r.lastSeen < week; });
-    const waiting = rows.filter(function (r) { return billState(r.uid).state === 'trialOver'; });
-    const unpaid = rows.filter(function (r) { const a = billState(r.uid); return a.state === 'open' && a.dueIn !== null && a.dueIn < 0; });
-    const notes = [];
-    if (open) notes.push(h('p', {}, open + ' offene Fehlermeldung' + (open === 1 ? '' : 'en') + '. ', h('a', { href: '#', text: 'Zu den Meldungen', onclick: function (e) { e.preventDefault(); S.tab = 'reports'; render(); } })));
-    if (idle.length) notes.push(h('p', { text: 'Länger als eine Woche nicht da: ' + idle.map(function (r) { return r.name || r.email; }).join(', ') + '.' }));
+    const go = function (tab, uid) { return function () { S.tab = tab; S.sel = uid || null; S.billForm = null; setHash(); render(); window.scrollTo(0, 0); }; };
+    const todo = [];
+    const item = function (title, text, label, fn) {
+      todo.push(h('div', { class: 'todo' }, h('div', {}, h('strong', { text: title }), text ? h('div', { class: 'hint', text: text }) : null), label ? btn(label, 'secondary small', fn) : null));
+    };
+    ppl.filter(function (r) { return r.todo; }).sort(peopleOrder('access')).forEach(function (r) {
+      item(r.name || r.email, r.a.state === 'trialOver' ? 'Gratis-Zeit vorbei, wartet auf Freischaltung' : r.left.text, r.a.state === 'trialOver' ? 'Freischalten' : 'Zahlung prüfen', go('people', r.uid));
+    });
+    ppl.filter(function (r) { return r.a.state === 'trial' && r.a.hoursLeft <= 24; }).forEach(function (r) {
+      item(r.name || r.email, 'Gratis-Zeit endet bald: ' + r.left.text, 'Öffnen', go('people', r.uid));
+    });
+    if (open) item(open + ' offene Fehlermeldung' + (open === 1 ? '' : 'en'), 'Von Personen in der App gemeldet', 'Ansehen', go('reports'));
     const ua = usageAssess();
-    if (ua && ua.verdict.level !== 'ok') notes.push(h('p', {}, ua.verdict.title + '. ', h('a', { href: '#usage', text: 'Zur Auslastung', onclick: function (e) { e.preventDefault(); S.tab = 'usage'; setHash(); render(); } })));
-    const toBilling = function (e) { e.preventDefault(); S.tab = 'billing'; setHash(); render(); };
-    if (waiting.length) notes.push(h('p', {}, 'Wartet auf Freischaltung: ' + waiting.map(function (r) { return r.name || r.email; }).join(', ') + '. ', h('a', { href: '#billing', text: 'Zur Monetarisierung', onclick: toBilling })));
-    if (unpaid.length) notes.push(h('p', {}, 'Zahlung offen: ' + unpaid.map(function (r) { return r.name || r.email; }).join(', ') + '. ', h('a', { href: '#billing', text: 'Zur Monetarisierung', onclick: toBilling })));
-    if (m.lastDate && m.lastDate < addDays(t, 14)) notes.push(h('p', { text: 'Der Vorrat reicht nur noch bis ' + fmtDay(m.lastDate) + '. Die Wochenaufgabe füllt sonntags auf.' }));
+    if (ua && ua.verdict.level !== 'ok') item(ua.verdict.title, 'Auslastung der kostenlosen Grenzen', 'Ansehen', go('system'));
+    if (m.lastDate && m.lastDate < addDays(t, 14)) item('Fakten-Vorrat reicht nur bis ' + fmtDay(m.lastDate), 'Die Wochenaufgabe füllt sonntags auf.', 'Ansehen', go('system'));
+    if (idle.length) item('Länger als eine Woche nicht da', idle.map(function (r) { return r.name || r.email; }).join(', '), null, null);
     return [
+      h('div', { class: 'card' }, h('h2', { text: 'Zu erledigen' }), todo.length ? todo : h('p', { class: 'muted', text: 'Nichts offen. Alles im grünen Bereich.' })),
       h('div', { class: 'kpis' },
         kpi(rows.filter(function (r) { return r.invited; }).length, 'Personen mit Zugang'),
-        kpi(activeToday, 'heute aktiv'), kpi(active7, 'aktiv in 7 Tagen'),
-        kpi(learned, 'Fakten gelernt, alle zusammen'), kpi(answered, 'Quizantworten gesamt'),
-        kpi(open, 'offene Meldungen'), kpi(m.lastDate ? fmtDay(m.lastDate) : '–', 'Vorrat reicht bis')),
-      notes.length ? h('div', { class: 'card' }, h('h2', { text: 'Zu beachten' }), notes) : null,
+        kpi(activeToday + ' / ' + active7, 'aktiv heute / in 7 Tagen'),
+        kpi(B.euro(monthly), 'Einnahmen pro Monat'),
+        kpi(m.lastDate ? fmtDay(m.lastDate) : '–', 'Fakten-Vorrat bis')),
       h('div', { class: 'card' }, h('h2', { text: 'Aktive Personen, letzte 14 Tage' }),
         h('div', { class: 'chart', role: 'img', 'aria-label': 'Aktive Personen pro Tag' }, days.map(function (d, i) {
           return h('div', { class: 'col', title: fmtDay(d) + ': ' + perDay[i] },
@@ -684,7 +725,7 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
         })),
         h('p', { class: 'hint', text: 'Gezählt wird, wer an dem Tag gelesen oder geübt hat.' })),
       h('div', { class: 'card' }, h('h2', { text: 'Bereiche über alle Personen' }),
-        h('p', { class: 'hint', text: 'Gelesene Fakten und Trefferquote der letzten 30 Antworten je Person, zusammengezählt. Schwache Bereiche kannst du unter „Für alle“ stärker gewichten.' }),
+        h('p', { class: 'hint', text: 'Zusammen ' + learned + ' Fakten gelernt und ' + answered + ' Quizfragen beantwortet. Gelesene Fakten und Trefferquote der letzten 30 Antworten je Person, zusammengezählt. Schwache Bereiche kannst du unter „Einstellungen“ stärker gewichten.' }),
         h('div', { class: 'tablewrap' }, h('table', {},
           h('thead', {}, h('tr', {}, h('th', { text: 'Bereich' }), h('th', { class: 'num', text: 'gelesen' }), h('th', { class: 'hide-sm' }), h('th', { class: 'num', text: 'richtig' }))),
           h('tbody', {}, AREAS.map(function (a) {
@@ -697,62 +738,96 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
   }
 
   function people() {
-    const rows = sortedRows();
-    const cols = [['name', 'Name'], ['lastSeen', 'Zuletzt da'], ['streak', 'Serie'], ['learned', 'Gelernt'], ['pct', 'Richtig'], ['reports', 'Meldungen']];
-    const sel = S.sel && rows.filter(function (r) { return r.uid === S.sel; })[0];
-    return [
-      h('div', { class: 'card' }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: 'Personen' }), rows.length ? btn('Als CSV herunterladen', 'secondary small', exportCsv) : null),
-        rows.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'click' },
-          h('thead', {}, h('tr', {}, cols.map(function (c, i) {
-            return h('th', { class: i >= 2 ? 'num' : null }, h('button', { type: 'button', class: 'sort' + (S.sort === c[0] ? ' on' : ''), text: c[1], onclick: function () { S.sort = c[0]; render(); } }));
-          }))),
-          h('tbody', {}, rows.map(function (r) {
-            return h('tr', { class: S.sel === r.uid ? 'sel' : null, tabindex: '0', onclick: function () { S.sel = S.sel === r.uid ? null : r.uid; render(); },
-              onkeydown: function (e) { if (e.key === 'Enter') { S.sel = r.uid; render(); } } },
-              h('td', {}, h('strong', { text: r.name || '–' }), h('div', { class: 'hint', text: r.email }),
-                r.admin ? h('span', { class: 'tag', text: 'Admin' }) : null, r.admin ? null : [' ', stateTag(billState(r.uid))]),
-              h('td', { text: fmtDay(r.lastSeen) }), h('td', { class: 'num', text: r.streak ? r.streak + ' T.' : '–' }),
-              h('td', { class: 'num', text: String(r.learned) }), h('td', { class: 'num', text: r.pct === null ? '–' : r.pct + ' %' }),
-              h('td', { class: 'num', text: String(r.reports) }));
-          })))) : h('p', { class: 'muted', text: 'Noch niemand hat sich angemeldet.' }),
-        h('p', { class: 'hint', text: 'Auf eine Zeile tippen für Details. Eine Person erscheint hier, sobald sie ihr Konto bestätigt und Lumen einmal geöffnet hat.' })),
-      sel ? personCard(sel) : null,
-      h('div', { class: 'card' }, h('h2', { text: 'Zugang' }),
-        h('p', { class: 'hint', text: 'Jede Person registriert sich selbst und hat zuerst ' + cfgTrialDays() + ' Tage gratis. Freischalten, Zahlungen und Sperren findest du unter „Monetarisierung“.' }),
-        btn('Zur Monetarisierung', 'secondary', function () { S.tab = 'billing'; setHash(); render(); }))
-    ];
+    const all = allPeople();
+    const inGroup = function (r, g) {
+      const s = r.a.state;
+      return g === 'all' || (g === 'todo' && r.todo) || (g === 'trial' && (s === 'trial' || s === 'none')) ||
+        (g === 'open' && (s === 'open' || s === 'admin')) || (g === 'locked' && (s === 'locked' || s === 'trialOver'));
+    };
+    const groups = [['all', 'Alle'], ['todo', 'Zu erledigen'], ['trial', 'Gratis-Zeit'], ['open', 'Freigeschaltet'], ['locked', 'Gesperrt']];
+    const g = groups.some(function (x) { return x[0] === S.group; }) ? S.group : 'all';
+    const rows = all.filter(function (r) { return inGroup(r, g); }).sort(peopleOrder(S.sort));
+    const monthly = all.filter(function (r) { return r.a.state === 'open'; }).reduce(function (n, r) { return n + (Number(r.b.amount) || 0); }, 0);
+    const cols = [['name', 'Name', ''], ['access', 'Zugang und wie lange noch', ''], ['lastSeen', 'Zuletzt da', 'hide-sm'], ['learned', 'Gelernt', 'num hide-sm'], ['amount', 'Betrag', 'num hide-sm']];
+    const openPerson = function (uid) { S.sel = uid; S.billForm = null; setHash(); render(); };
+    return h('div', { class: 'card' },
+      h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: all.length + (all.length === 1 ? ' Person' : ' Personen') + (monthly ? ' · ' + B.euro(monthly) + ' im Monat' : '') }),
+        all.length ? btn('Als CSV herunterladen', 'secondary small', exportCsv) : null),
+      h('div', { class: 'filters', role: 'group', 'aria-label': 'Filter' }, groups.map(function (x) {
+        const n = all.filter(function (r) { return inGroup(r, x[0]); }).length;
+        if (x[0] !== 'all' && x[0] !== g && !n) return null;
+        return h('button', { type: 'button', 'aria-pressed': String(g === x[0]), text: x[1] + ' · ' + n, onclick: function () { S.group = x[0]; render(); } });
+      })),
+      rows.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'click' },
+        h('thead', {}, h('tr', {}, cols.map(function (c) {
+          return h('th', { class: c[2] || null }, h('button', { type: 'button', class: 'sort' + (S.sort === c[0] ? ' on' : ''), text: c[1], onclick: function () { S.sort = c[0]; render(); } }));
+        }))),
+        h('tbody', {}, rows.map(function (r) {
+          return h('tr', { tabindex: '0', onclick: function () { openPerson(r.uid); }, onkeydown: function (e) { if (e.key === 'Enter') openPerson(r.uid); } },
+            h('td', {}, h('strong', { text: r.name || r.email || 'Unbekannt' }), r.name && r.email ? h('div', { class: 'hint', text: r.email }) : null),
+            h('td', {}, stateTag(r.a), h('div', { class: 'left' + (r.left.level ? ' ' + r.left.level : ''), text: r.left.text })),
+            h('td', { class: 'hide-sm', text: fmtDay(r.lastSeen) }),
+            h('td', { class: 'num hide-sm', text: String(r.learned || 0) }),
+            h('td', { class: 'num hide-sm', text: r.a.state === 'open' && r.b.amount ? B.euro(r.b.amount) : '–' }));
+        })))) : h('p', { class: 'muted', text: all.length ? 'In dieser Gruppe ist gerade niemand.' : 'Noch niemand hat sich angemeldet.' }),
+      h('p', { class: 'hint', text: 'Auf eine Person tippen: Freischalten, Zahlung eintragen, Sperren und Lernstand. Neue Personen haben zuerst ' + cfgTrialDays() + ' Tage gratis, danach sperrt die App von selbst. Freigeschaltete werden nie automatisch gesperrt.' }));
   }
-  function personCard(r) {
-    const d = S.digests[r.uid] || {}, t = todayVienna(), email = norm(r.email), self = norm(S.user && S.user.email) === email;
+
+  /* One person in a window over the list: access and payment first, then learning progress. */
+  function personModal(uid) {
+    const r = allPeople().filter(function (x) { return x.uid === uid; })[0];
+    if (!r) return null;
+    const close = function () { S.sel = null; S.billForm = null; setHash(); render(); };
+    return h('div', { class: 'modal', onclick: function (e) { if (e.target === e.currentTarget) close(); } },
+      h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': r.name || r.email || 'Person' },
+        h('div', { class: 'sheethead' }, h('div', {}, h('h2', { text: r.name || r.email || 'Unbekannt' }), r.name && r.email ? h('p', { class: 'hint', text: r.email }) : null),
+          btn('Schließen', 'secondary small', close)),
+        h('section', {}, h('h3', { text: 'Zugang und Zahlung' }), accessSection(uid)),
+        h('section', {}, h('h3', { text: 'Lernstand' }), learnSection(r)),
+        moreActions(r)));
+  }
+  function learnSection(r) {
+    const d = S.digests[r.uid] || {}, t = todayVienna();
     const strip = [];
     for (let i = 29; i >= 0; i -= 1) { const day = addDays(t, -i); strip.push(h('i', { class: r.active.indexOf(day) !== -1 ? 'on' : null, title: fmtDay(day) })); }
     const acc = d.areaAccuracy || {};
     const maxRead = Math.max.apply(null, AREAS.map(function (a) { return (acc[a[0]] && acc[a[0]].read) || 0; }).concat([1]));
-    return h('div', { class: 'card person' },
-      h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: (r.name || r.email) + (r.name ? ' · ' + r.email : '') }), btn('Schließen', 'secondary small', function () { S.sel = null; render(); })),
+    return [
       h('div', { class: 'kpis' }, kpi(fmtDay(r.start), 'dabei seit'), kpi(fmtDay(r.lastSeen), 'zuletzt da'), kpi(r.streak ? r.streak + ' Tage' : '–', 'Serie'),
-        kpi(r.learned, 'gelernt'), kpi(r.known, 'als bekannt markiert'), kpi(r.answered, 'Quizantworten'), kpi(r.pct === null ? '–' : r.pct + ' %', 'richtig (zuletzt)'), kpi(r.due, 'fällig zum Auffrischen')),
+        kpi(r.learned, 'gelernt'), kpi(r.answered, 'Quizantworten'), kpi(r.pct === null ? '–' : r.pct + ' %', 'richtig (zuletzt)')),
       h('div', {}, h('p', { class: 'hint', text: 'Aktive Tage, letzte 30 Tage' }), h('div', { class: 'strip' }, strip)),
-      h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, AREAS.map(function (a) {
-        const x = acc[a[0]] || { read: 0, pct: null };
-        return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num', text: String(x.read || 0) }),
-          h('td', { class: 'hide-sm' }, h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.round(100 * (x.read || 0) / maxRead) + '%' }))),
-          h('td', { class: 'num', text: x.pct === null || x.pct === undefined ? '–' : x.pct + ' %' }));
-      })))),
+      h('details', {}, h('summary', { text: 'Nach Bereichen' }),
+        h('div', { class: 'tablewrap' }, h('table', {}, h('tbody', {}, AREAS.map(function (a) {
+          const x = acc[a[0]] || { read: 0, pct: null };
+          return h('tr', {}, h('td', { text: a[1] }), h('td', { class: 'num', text: String(x.read || 0) }),
+            h('td', { class: 'hide-sm' }, h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.round(100 * (x.read || 0) / maxRead) + '%' }))),
+            h('td', { class: 'num', text: x.pct === null || x.pct === undefined ? '–' : x.pct + ' %' }));
+        }))))),
       (d.reports || []).length ? h('div', {}, h('p', { class: 'hint', text: 'Fehlermeldungen' }), (d.reports || []).map(function (rep) {
         return h('p', { text: fmtDay(rep.reportedAt) + ' · ' + (S.titles[rep.factId] || rep.factId) + (rep.note ? ': ' + rep.note : '') });
-      })) : null,
+      })) : null
+    ];
+  }
+  function moreActions(r) {
+    const email = norm(r.email), self = norm(S.user && S.user.email) === email;
+    if (self) return null;
+    return h('details', { class: 'more' }, h('summary', { text: 'Weitere Aktionen' }),
       h('div', { class: 'row' },
-        self ? null : btn(r.admin ? 'Admin-Rechte entfernen' : 'Zum Admin machen', 'secondary', function () {
+        btn(r.admin ? 'Admin-Rechte entfernen' : 'Zum Admin machen', 'secondary', function () {
           const list = S.access.adminEmails.filter(function (x) { return x !== email; });
           if (!r.admin) { if (!window.confirm(r.email + ' zum Admin machen? Die Person sieht dann alle Lernstände und kann alles hier ändern.')) return; list.push(email); }
           saveAccess({ adminEmails: list.sort() }, r.admin ? 'Admin-Rechte entfernt.' : 'Ist jetzt Admin.');
         }, S.busy || !email),
-        self || r.admin ? null : btn('Zahlung und Zugang', 'secondary', function () { S.tab = 'billing'; S.billSel = r.uid; S.billForm = null; setHash(); render(); window.scrollTo(0, 0); }),
-        self ? null : btn('Lernstand löschen', 'danger', function () {
+        btn('Lernstand löschen', 'danger', function () {
           if (!window.confirm('Den gesamten Lernstand von ' + (r.name || r.email) + ' endgültig löschen? Das lässt sich nicht rückgängig machen.')) return;
           deletePersonData(r.uid);
         }, S.busy)));
+  }
+  function settingsTab() {
+    return [h('h2', { class: 'section-title', text: 'Für alle in der App' }), forAll(), h('h2', { class: 'section-title', text: 'Bezahlung' }), settingsCard()];
+  }
+  function systemTab() {
+    return [h('h2', { class: 'section-title', text: 'Auslastung' }), usageView(), h('h2', { class: 'section-title', text: 'Neue Fakten' }), weekly()];
   }
 
   function forAll() {
@@ -1035,18 +1110,22 @@ input[type="email"], input[type="password"], input[type="text"], textarea, selec
     ];
   }
 
-  /* Deep links from the dashboard connector: admin.html#people/<uid>, #reports, #weekly … */
+  /* Deep links from the dashboard connector and the reminders: admin.html#people/<uid>, #reports …
+     Older names still work: #billing/<uid> opens the person, #usage and #weekly open "System". */
   function fromHash() {
     const m = /^#([a-z]+)(?:\/(.+))?$/.exec(location.hash || '');
-    if (!m || !TABS.some(function (t) { return t[0] === m[1]; })) return false;
-    S.tab = m[1];
-    if (m[1] === 'people' && m[2]) S.sel = decodeURIComponent(m[2]);
-    if (m[1] === 'billing') { S.billSel = m[2] ? decodeURIComponent(m[2]) : null; S.billForm = null; }
+    if (!m) return false;
+    const tab = ({ billing: 'people', usage: 'system', weekly: 'system' })[m[1]] || m[1];
+    if (!TABS.some(function (t) { return t[0] === tab; })) return false;
+    S.tab = tab;
+    S.sel = tab === 'people' && m[2] ? decodeURIComponent(m[2]) : null;
+    S.billForm = null;
     return true;
   }
-  function setHash() { try { history.replaceState(null, '', '#' + S.tab + (S.tab === 'billing' && S.billSel ? '/' + S.billSel : '')); } catch (e) { /* ignore */ } }
+  function setHash() { try { history.replaceState(null, '', '#' + S.tab + (S.tab === 'people' && S.sel ? '/' + S.sel : '')); } catch (e) { /* ignore */ } }
   fromHash();
   window.addEventListener('hashchange', function () { if (fromHash()) render(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && S.sel && S.tab === 'people') { S.sel = null; S.billForm = null; setHash(); render(); } });
   boot();
 })();
 </script>

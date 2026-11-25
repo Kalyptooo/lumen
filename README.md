@@ -3,7 +3,7 @@
 Fünf Fakten am Tag, ein kurzes Quiz zum Vortag und Auffrischung nach dem Leitner-Prinzip. Für eine kleine Gruppe, mit Anmeldung per E-Mail und Passwort.
 
 - **Lernseite:** `index.html` (auf dem iPhone über „Teilen“ → „Zum Home-Bildschirm“ wie eine App)
-- **Admin-Seite:** `admin.html` (Übersicht, Personen, Monetarisierung, Themen für alle, Fehlermeldungen)
+- **Admin-Seite:** `admin.html` (Übersicht mit „Zu erledigen“, Personen mit Zugang und Zahlung, Fakten, Meldungen, Einstellungen, System mit Auslastung und Wochenaufgabe)
 
 ## Aufbau
 
@@ -25,7 +25,7 @@ Anmeldung: Firebase Authentication (E-Mail und Passwort, Adresse muss bestätigt
 | `admin.html` | Admin-Seite |
 | `lumen-connect.js`, `connect.json`, `CONNECT.md` | Anschluss für ein eigenes Dashboard: Zahlen lesen, alltägliche Admin-Aktionen, Sprung-Links in die Admin-Seite (`admin.html#people/<uid>` usw.). Beispiel: `dashboard-beispiel.html` |
 | `tools/notify.mjs`, `tools/fb-rest.mjs` | Meldungen ans Dashboard-Postfach (`node tools/notify.mjs warn "Titel" "Text"`), REST-Helfer für das Dienstkonto |
-| `lumen-usage.js`, `tools/usage-report.mjs` | Tab „Auslastung“: misst stündlich (mit den Erinnerungen) die kostenlosen Grenzen und bewertet sie; zugleich der Wächter, der Meldungen ans Postfach schickt. Für die Lesezahlen braucht das Dienstkonto die Rolle „Monitoring-Betrachter“ |
+| `lumen-usage.js`, `tools/usage-report.mjs` | Admin-Tab „System“ → Auslastung: misst stündlich (mit den Erinnerungen) die kostenlosen Grenzen und bewertet sie; zugleich der Wächter, der Meldungen ans Postfach schickt. Für die Lesezahlen braucht das Dienstkonto die Rolle „Monitoring-Betrachter“ |
 | `lumen-billing.js`, `tools/billing-reminders.mjs` | Bezahlen: jede Person registriert sich selbst, hat ein paar Tage gratis, dann schaltet der Admin nach einer Überweisung frei (monatlich im Voraus) oder sperrt. Zahltag-Erinnerungen an die Person und die Admins kommen einmal am Tag ab 9 Uhr mit dem Erinnerungs-Ablauf. Die eigentliche Sperre steht in `firestore.rules` |
 | `lumen-cloud.js` | Anmeldung, Datenbank und Laden der Inhalte aus `data/`, von beiden Seiten genutzt |
 | `firebase-config.js` | Kennung des Firebase-Projekts (öffentlich, kein Geheimnis) |
