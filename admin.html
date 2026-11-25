@@ -27,6 +27,8 @@
   --accent: #ff9f0a; --on-accent: #000000; --good: #30d158; --warn: #ffb340; --warn-soft: #33260f; --danger: #ff6961; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+/* Always keep room for the scrollbar, so the page does not shift sideways between short and long tabs. */
+html { scrollbar-gutter: stable; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 1rem; line-height: 1.5; }
 h1, h2, h3, p { margin: 0; }
