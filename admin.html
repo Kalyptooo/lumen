@@ -173,6 +173,17 @@ body.modal-open { overflow: hidden; }
   .todo { flex-wrap: wrap; }
 }
 .row.nowrap { flex-wrap: nowrap; }
+.chart.months { grid-template-columns: repeat(12, 1fr); }
+@media (min-width: 40rem) { .kpis.three { grid-template-columns: repeat(3, 1fr); } }
+.chart.months .v { font-size: .625rem; white-space: nowrap; }
+.stage { display: flex; flex-direction: column; gap: 6px; }
+.stagehead { display: flex; justify-content: space-between; gap: 12px; }
+.stage .bar { height: 10px; border-radius: 5px; }
+.list { display: flex; flex-direction: column; }
+.listrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: .5px solid var(--line); }
+.listrow:first-child { border-top: 0; padding-top: 0; }
+.hint.warn, td.warn { color: var(--warn); }
+.grid2 > .card { min-width: 0; }
 .usage-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 </style>
 </head>
@@ -200,7 +211,7 @@ body.modal-open { overflow: hidden; }
   const AREA_NAME = {};
   AREAS.forEach(function (a) { AREA_NAME[a[0]] = a[1]; });
   const DEFAULT_TIMES = { morgen: '07:00', mittag: '12:00', abend: '18:00' };
-  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['settings', 'Einstellungen'], ['system', 'System']];
+  const TABS = [['overview', 'Übersicht'], ['people', 'Personen'], ['money', 'Einnahmen'], ['facts', 'Fakten'], ['reports', 'Meldungen'], ['settings', 'Einstellungen'], ['system', 'System']];
   const B = window.LumenBilling;
   const S = {
     phase: 'boot', user: null, tab: 'overview', access: null, pub: null, members: {}, digests: {}, manifest: null,
@@ -494,7 +505,7 @@ body.modal-open { overflow: hidden; }
     if (a.state === 'admin') return h('p', { class: 'muted', text: 'Admins sind immer freigeschaltet und zahlen nichts.' });
     if (!S.billForm || S.billForm.uid !== uid) {
       S.billForm = { uid: uid, amount: b.amount ? String(b.amount) : '', nextPay: b.nextPay || B.nextMonth(t), remindPush: b.remindPush !== false, remindEmail: !!b.remindEmail,
-        message: b.message || '', lockOpen: false };
+        message: b.message || '', lockOpen: false, paidNow: true };
     }
     const F = S.billForm;
     const amountIn = h('input', { type: 'number', min: '0', step: '0.5', inputmode: 'decimal', value: F.amount, oninput: function (e) { F.amount = e.target.value; } });
@@ -534,13 +545,14 @@ body.modal-open { overflow: hidden; }
         kpi(b.paidAt ? fmtDay(b.paidAt) : '–', 'zuletzt bezahlt')));
     }
     const ref = B.reference(m.name, m.email);
-    return [info, m.email ? h('p', { class: 'hint', text: 'Verwendungszweck für die Überweisung: ' + ref }) : null,
+    return [info, m.email ? h('p', { class: 'hint', text: 'Verwendungszweck für die Überweisung: ' + ref }) : null, paymentList(uid),
       a.state === 'open' ? [
         h('div', { class: 'row' },
           btn('Zahlung erhalten', 'primary', function () {
             const next = B.afterPayment(b, todayVienna());
             if (!window.confirm('Zahlung von ' + name + ' erhalten? Der nächste Zahltag wird der ' + fmtDay(next, true) + '.')) return;
-            saveBill(uid, { nextPay: next, paidAt: nowISO() }, 'Bezahlt. Nächster Zahltag: ' + fmtDay(next, true) + '.');
+            const at = nowISO();
+            saveBill(uid, { nextPay: next, paidAt: at, payments: B.withPayment(b, at, b.amount, b.nextPay) }, 'Bezahlt. Nächster Zahltag: ' + fmtDay(next, true) + '.');
           }, S.busy),
           F.lockOpen ? null : lockButton),
         F.lockOpen ? lockArea : null,
@@ -548,11 +560,14 @@ body.modal-open { overflow: hidden; }
           btn('Speichern', 'secondary', function () { const x = terms(); if (x) saveBill(uid, x, 'Gespeichert.'); }, S.busy))
       ] : [
         h('h3', { text: a.state === 'locked' ? 'Wieder freischalten' : 'Freischalten' }), form,
+        check('Erste Zahlung heute erhalten (zählt unter „Einnahmen“)', 'paidNow'),
         h('div', { class: 'row' },
           btn(a.state === 'locked' ? 'Wieder freischalten' : 'Freischalten', 'primary', function () {
             const x = terms();
             if (!x) return;
-            saveBill(uid, Object.assign(x, { status: 'open', message: '', unlockedAt: nowISO() }), name + ' ist freigeschaltet.');
+            const at = nowISO();
+            const paid = F.paidNow && x.amount > 0 ? { paidAt: at, payments: B.withPayment(b, at, x.amount, todayVienna()) } : {};
+            saveBill(uid, Object.assign(x, { status: 'open', message: '', unlockedAt: at }, paid), name + ' ist freigeschaltet.');
           }, S.busy),
           a.state === 'trial' || a.state === 'trialOver' ? btn('Gratis-Zeit um 3 Tage verlängern', 'secondary', function () {
             const days = (Number.isInteger(b.trialDays) ? b.trialDays : cfgTrialDays()) + 3;
@@ -666,7 +681,7 @@ body.modal-open { overflow: hidden; }
       TABS.map(function (t) {
         return h('button', { type: 'button', text: t[1] + (t[0] === 'reports' && open ? ' (' + open + ')' : ''), 'aria-pressed': String(S.tab === t[0]), onclick: function () { S.tab = t[0]; S.sel = null; S.billForm = null; setHash(); render(); } });
       })));
-    const view = { overview: overview, people: people, settings: settingsTab, facts: facts, reports: reports, system: systemTab }[S.tab];
+    const view = { overview: overview, people: people, money: money, settings: settingsTab, facts: facts, reports: reports, system: systemTab }[S.tab];
     add(root, view());
     const modal = S.tab === 'people' && S.sel ? personModal(S.sel) : null;
     add(root, modal);
@@ -842,6 +857,117 @@ body.modal-open { overflow: hidden; }
           deletePersonData(r.uid);
         }, S.busy)));
   }
+  /* ---------- Einnahmen: statistics of payments, from billing/<uid>.payments (B.stats) ---------- */
+  const monthName = function (k) { return new Date(k + '-15T12:00:00Z').toLocaleDateString('de-AT', { month: 'short', timeZone: 'UTC' }); };
+  const monthLong = function (k) { return new Date(k + '-15T12:00:00Z').toLocaleDateString('de-AT', { month: 'long', year: 'numeric', timeZone: 'UTC' }); };
+  const pct = function (v) { return v === null || v === undefined ? '–' : v + ' %'; };
+  function moneyStats() {
+    return B.stats(allPeople().map(function (r) { return { uid: r.uid, name: r.name || r.email || 'Unbekannt', b: r.b, a: r.a }; }), todayVienna());
+  }
+  function exportPayments(s) {
+    const esc = function (v) { const x = v === null || v === undefined ? '' : String(v); return /[";\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+    const lines = [['Datum', 'Person', 'Betrag', 'Für Zahltag', 'Tage zu spät'].join(';')].concat(s.payments.map(function (p) {
+      const late = B.lateBy(p);
+      return [p.day, p.name, String(p.amount).replace('.', ','), p.due || '', late === null ? '' : Math.max(0, late)].map(esc).join(';');
+    }));
+    const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = h('a', { href: url, download: 'lumen-zahlungen-' + todayVienna() + '.csv', style: 'display:none' });
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+  function money() {
+    const s = moneyStats(), e = B.euro;
+    const goPerson = function (uid) { return function () { S.tab = 'people'; S.sel = uid; S.billForm = null; setHash(); render(); window.scrollTo(0, 0); }; };
+    const diff = s.thisMonth - s.lastMonth;
+    const maxMonth = Math.max.apply(null, s.months.map(function (m) { return m.sum; }).concat([1]));
+    const f = s.funnel;
+    const stage = function (label, n, of, note) {
+      const w = f.signedUp ? Math.max(n ? 2 : 0, Math.round(100 * n / f.signedUp)) : 0;
+      return h('div', { class: 'stage' }, h('div', { class: 'stagehead' }, h('span', { text: label }), h('b', { text: String(n) + (of ? ' · ' + of : '') })),
+        h('div', { class: 'bar' }, h('i', { style: 'width:' + w + '%' })), note ? h('p', { class: 'hint', text: note }) : null);
+    };
+    const personLink = function (uid, name) { return h('a', { href: '#people/' + uid, text: name, onclick: function (ev) { ev.preventDefault(); goPerson(uid)(); } }); };
+    return [
+      h('div', { class: 'kpis three' },
+        kpi(e(s.monthly), 'fest pro Monat (' + s.paying + (s.paying === 1 ? ' Person zahlt' : ' Personen zahlen') + ')'),
+        kpi(e(s.thisMonth), 'erhalten im ' + monthName(s.thisMonthKey) + (s.lastMonth || s.thisMonth ? ' (' + (diff >= 0 ? '+' : '−') + e(Math.abs(diff)) + ' zum Vormonat)' : '')),
+        kpi(e(s.totalPaid), 'erhalten insgesamt (' + s.paymentsCount + (s.paymentsCount === 1 ? ' Zahlung' : ' Zahlungen') + ')'),
+        kpi(e(s.overdueSum), 'offen (' + s.overdue.length + (s.overdue.length === 1 ? ' Person' : ' Personen') + ')'),
+        kpi(e(s.upcomingSum), 'erwartet in 30 Tagen'),
+        kpi(pct(f.rate), 'zahlen nach der Gratis-Zeit')),
+      h('div', { class: 'card' }, h('h2', { text: 'Erhalten pro Monat' }),
+        h('div', { class: 'chart months', role: 'img', 'aria-label': 'Erhaltene Zahlungen pro Monat' }, s.months.map(function (m) {
+          return h('div', { class: 'col', title: monthLong(m.month) + ': ' + e(m.sum) + ' aus ' + m.count + (m.count === 1 ? ' Zahlung' : ' Zahlungen') },
+            h('span', { class: 'v', text: m.sum ? e(m.sum) : '' }),
+            h('i', { style: 'height:' + Math.max(m.sum ? 3 : 1, Math.round(100 * m.sum / maxMonth)) + '%' }),
+            h('span', { class: 'd', text: monthName(m.month) }));
+        })),
+        h('p', { class: 'hint', text: s.paymentsCount ? 'Gezählt wird jede Zahlung, die du mit „Zahlung erhalten“ oder beim Freischalten bestätigt hast, im Monat der Bestätigung. Erste erfasste Zahlung: ' + fmtDay(s.firstPayment, true) + '.'
+          : 'Noch keine Zahlungen erfasst. Ab jetzt zählt jede Zahlung, die du mit „Zahlung erhalten“ oder beim Freischalten bestätigst.' })),
+      h('div', { class: 'grid2' },
+        h('div', { class: 'card' }, h('h2', { text: 'Kommende Zahltage' }),
+          s.upcoming.length ? h('div', { class: 'list' }, s.upcoming.map(function (u) {
+            return h('div', { class: 'listrow' }, h('div', {}, personLink(u.uid, u.name), h('div', { class: 'hint', text: fmtDay(u.due, true) + (u.inDays === 0 ? ' · heute' : u.inDays === 1 ? ' · morgen' : ' · in ' + u.inDays + ' Tagen') })), h('b', { text: e(u.amount) }));
+          })) : h('p', { class: 'muted', text: 'In den nächsten 30 Tagen ist kein Zahltag.' }),
+          s.upcoming.length ? h('p', { class: 'hint', text: 'Zusammen ' + e(s.upcomingSum) + '.' }) : null),
+        h('div', { class: 'card' }, h('h2', { text: 'Offene Zahlungen' }),
+          s.overdue.length ? h('div', { class: 'list' }, s.overdue.map(function (u) {
+            return h('div', { class: 'listrow' }, h('div', {}, personLink(u.uid, u.name), h('div', { class: 'hint warn', text: 'Zahltag ' + fmtDay(u.due) + ' · seit ' + u.days + (u.days === 1 ? ' Tag' : ' Tagen') })), h('b', { text: e(u.amount) }));
+          })) : h('p', { class: 'muted', text: 'Alle haben bezahlt.' }),
+          s.overdue.length ? h('p', { class: 'hint', text: 'Zusammen ' + e(s.overdueSum) + '. Nach ' + B.LATE_AFTER + ' Tagen bekommst du eine zweite Erinnerung.' }) : null)),
+      h('div', { class: 'card' }, h('h2', { text: 'Von der Gratis-Zeit zum Zahlen' }),
+        stage('Registriert', f.signedUp, '', s.counts.trial + ' gerade in der Gratis-Zeit, ' + s.counts.none + ' noch nie geöffnet'),
+        stage('Gratis-Zeit vorbei', f.decided, f.signedUp ? Math.round(100 * f.decided / f.signedUp) + ' %' : '', s.counts.trialOver ? s.counts.trialOver + ' warten gerade auf Freischaltung' : 'Niemand wartet gerade auf Freischaltung'),
+        stage('Haben bezahlt', f.converted, pct(f.rate) + ' davon', 'Freigeschaltet oder mindestens eine Zahlung'),
+        stage('Zahlen weiterhin', f.paying, pct(f.keep) + ' davon', f.left ? f.left + (f.left === 1 ? ' Person hat' : ' Personen haben') + ' später aufgehört (gesperrt)' : 'Niemand hat aufgehört'),
+        h('p', { class: 'hint', text: 'Admins zählen nicht mit.' })),
+      h('div', { class: 'kpis' },
+        kpi(e(s.avgAmount), 'Durchschnitt pro zahlender Person und Monat'),
+        kpi(e(s.perPayer), 'bisher erhalten pro zahlender Person'),
+        kpi(pct(s.punctuality.rate), 'Zahlungen pünktlich (' + s.punctuality.onTime + ' von ' + s.punctuality.count + ')'),
+        kpi(s.punctuality.avgLate ? s.punctuality.avgLate.toLocaleString('de-AT') + ' Tage' : '–', 'zu spät im Schnitt, wenn zu spät')),
+      h('div', { class: 'card' }, h('h2', { text: 'Je Person' }),
+        s.perPerson.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'click' },
+          h('thead', {}, h('tr', {}, h('th', { text: 'Name' }), h('th', { text: 'Stand' }), h('th', { class: 'num', text: 'pro Monat' }),
+            h('th', { class: 'num hide-sm', text: 'Zahlungen' }), h('th', { class: 'num', text: 'gesamt' }), h('th', { class: 'num hide-sm', text: 'pünktlich' }), h('th', { class: 'hide-sm', text: 'zahlt seit' }))),
+          h('tbody', {}, s.perPerson.map(function (r) {
+            return h('tr', { tabindex: '0', onclick: goPerson(r.uid), onkeydown: function (ev) { if (ev.key === 'Enter') goPerson(r.uid)(); } },
+              h('td', {}, h('strong', { text: r.name })), h('td', {}, stateTag(billState(r.uid))),
+              h('td', { class: 'num', text: r.amount ? e(r.amount) : '–' }), h('td', { class: 'num hide-sm', text: String(r.payments) }),
+              h('td', { class: 'num', text: r.paid ? e(r.paid) : '–' }), h('td', { class: 'num hide-sm', text: pct(r.onTime) }),
+              h('td', { class: 'hide-sm', text: r.since ? fmtDay(r.since) : '–' }));
+          })))) : h('p', { class: 'muted', text: 'Noch niemand.' })),
+      h('div', { class: 'card' }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { text: 'Alle Zahlungen' }),
+          s.payments.length ? btn('Als CSV herunterladen', 'secondary small', function () { exportPayments(s); }) : null),
+        s.payments.length ? h('div', { class: 'tablewrap' }, h('table', {},
+          h('thead', {}, h('tr', {}, h('th', { text: 'Datum' }), h('th', { text: 'Person' }), h('th', { class: 'num', text: 'Betrag' }), h('th', { class: 'hide-sm', text: 'für Zahltag' }), h('th', { text: 'pünktlich' }))),
+          h('tbody', {}, s.payments.slice(0, 50).map(function (p) {
+            const late = B.lateBy(p);
+            return h('tr', {}, h('td', { text: fmtDay(p.day) }), h('td', {}, personLink(p.uid, p.name)), h('td', { class: 'num', text: e(p.amount) }),
+              h('td', { class: 'hide-sm', text: p.due ? fmtDay(p.due) : '–' }),
+              h('td', { class: late > 0 ? 'warn' : null, text: late === null ? '–' : late > 0 ? late + (late === 1 ? ' Tag' : ' Tage') + ' zu spät' : 'ja' }));
+          })))) : h('p', { class: 'muted', text: 'Noch keine Zahlungen erfasst.' }),
+        s.payments.length > 50 ? h('p', { class: 'hint', text: 'Die letzten 50 von ' + s.payments.length + '. Alle stehen in der CSV-Datei.' }) : null)
+    ];
+  }
+  /* Payments of one person, inside the person window; a wrongly entered one can be removed. */
+  function paymentList(uid) {
+    const b = S.bills[uid] || {}, list = B.paymentsOf(b);
+    if (!list.length) return null;
+    const total = list.reduce(function (n, p) { return n + (Number(p.amount) || 0); }, 0);
+    return h('details', {}, h('summary', { text: 'Zahlungen (' + list.length + ') · zusammen ' + B.euro(total) }),
+      h('div', { class: 'list' }, list.slice().reverse().map(function (p) {
+        const late = B.lateBy(p);
+        return h('div', { class: 'listrow' },
+          h('div', {}, h('strong', { text: B.euro(p.amount) + ' am ' + fmtDay(B.viennaDay(p.at)) }),
+            h('div', { class: 'hint' + (late > 0 ? ' warn' : ''), text: (p.due ? 'für den Zahltag ' + fmtDay(p.due) : 'ohne Zahltag') + (late === null ? '' : late > 0 ? ' · ' + late + (late === 1 ? ' Tag' : ' Tage') + ' zu spät' : ' · pünktlich') })),
+          btn('Entfernen', 'secondary small', function () {
+            if (!window.confirm('Diese Zahlung aus der Statistik entfernen? Der Zahltag bleibt, wie er ist.')) return;
+            saveBill(uid, { payments: B.paymentsOf(b).filter(function (x) { return !(x.at === p.at && x.amount === p.amount); }) }, 'Zahlung entfernt.');
+          }, S.busy));
+      })));
+  }
+
   function settingsTab() {
     return [h('h2', { class: 'section-title', text: 'Für alle in der App' }), forAll(), h('h2', { class: 'section-title', text: 'Bezahlung' }), settingsCard()];
   }

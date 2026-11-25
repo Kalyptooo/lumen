@@ -7,6 +7,7 @@
      remindPush  payment reminder on the phone; remindEmail: by e-mail (not set up yet)
      message     shown to the person when locked; admin: true for admins (never locked)
      remind1 / remind2: the due date for which the first / second reminder went out (written by tools/billing-reminders.mjs)
+     payments    log of confirmed payments [{ at, amount, due }] for the statistics (written by the admin page)
    The real lock is in firestore.rules; this file only decides what the pages show and which reminders are owed.
    Used by index.html, admin.html, lumen-connect.js and tools/billing-reminders.mjs. Pure functions, tested in tests/billing.test.mjs. */
 (function (root) {
@@ -97,6 +98,91 @@
     return nextMonth(base, (b && b.payDay) || Number(base.slice(8, 10)));
   }
 
+  /* ---------- payment log and statistics (admin tab "Einnahmen") ----------
+     billing/<uid>.payments: [{ at: ISO time the admin confirmed it, amount: euros, due: payday it was for (YYYY-MM-DD) }],
+     written by the admin page, newest last, at most PAYMENTS_KEPT entries. */
+  const PAYMENTS_KEPT = 120;
+  const viennaDay = function (iso) {
+    const t = ms(iso);
+    if (isNaN(t)) return '';
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+  };
+  const paymentsOf = function (b) {
+    return (b && Array.isArray(b.payments) ? b.payments : []).filter(function (p) { return p && !isNaN(ms(p.at)) && Number(p.amount) >= 0; });
+  };
+  /* The log after one more payment. */
+  function withPayment(b, atIso, amount, due) {
+    return paymentsOf(b).concat([{ at: atIso, amount: Math.round((Number(amount) || 0) * 100) / 100, due: isDate(due) ? due : null }]).slice(-PAYMENTS_KEPT);
+  }
+  /* Days a payment came after its payday (0 or less: on time). null without a payday. */
+  const lateBy = function (p) { return isDate(p.due) ? daysBetween(p.due, viennaDay(p.at)) : null; };
+  const monthKey = function (d) { return d.slice(0, 7); };
+  function lastMonths(today, n) {
+    const out = [];
+    let y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+    for (let i = 0; i < n; i += 1) { out.unshift(y + '-' + pad(m)); m -= 1; if (!m) { m = 12; y -= 1; } }
+    return out;
+  }
+
+  /* Everything the "Einnahmen" tab shows. people: [{ uid, name, b (billing record or {}), a (access(b, …)) }]. */
+  function stats(people, today) {
+    const sum = function (list, f) { return Math.round(list.reduce(function (n, x) { return n + (Number(f(x)) || 0); }, 0) * 100) / 100; };
+    const rows = people.filter(function (p) { return p.a.state !== 'admin'; });
+    const open = rows.filter(function (p) { return p.a.state === 'open'; });
+    const all = [];
+    rows.forEach(function (p) { paymentsOf(p.b).forEach(function (x) { all.push(Object.assign({ uid: p.uid, name: p.name, day: viennaDay(x.at) }, x)); }); });
+    all.sort(function (x, y) { return x.day < y.day ? -1 : x.day > y.day ? 1 : 0; });
+    const thisMonth = monthKey(today), months = lastMonths(today, 12), prevMonth = months[10];
+    const byMonth = months.map(function (k) {
+      const list = all.filter(function (x) { return monthKey(x.day) === k; });
+      return { month: k, sum: sum(list, function (x) { return x.amount; }), count: list.length };
+    });
+    const overdue = open.filter(function (p) { return p.a.dueIn !== null && p.a.dueIn < 0; })
+      .map(function (p) { return { uid: p.uid, name: p.name, amount: Number(p.b.amount) || 0, due: p.a.due, days: -p.a.dueIn }; })
+      .sort(function (x, y) { return y.days - x.days; });
+    const upcoming = open.filter(function (p) { return p.a.dueIn !== null && p.a.dueIn >= 0 && p.a.dueIn <= 30; })
+      .map(function (p) { return { uid: p.uid, name: p.name, amount: Number(p.b.amount) || 0, due: p.a.due, inDays: p.a.dueIn }; })
+      .sort(function (x, y) { return x.inDays - y.inDays; });
+    // From free days to paying: who had the chance to decide, who ever paid or was unlocked, who still pays, who left again.
+    const everOpen = function (p) { return p.a.state === 'open' || !!p.b.unlockedAt || paymentsOf(p.b).length > 0; };
+    const decided = rows.filter(function (p) { return p.a.state === 'trialOver' || p.a.state === 'locked' || everOpen(p); });
+    const converted = rows.filter(everOpen);
+    const left = rows.filter(function (p) { return p.a.state === 'locked' && everOpen(p); });
+    const dated = all.filter(function (x) { return lateBy(x) !== null; });
+    const late = dated.filter(function (x) { return lateBy(x) > 0; });
+    const payers = {};
+    all.forEach(function (x) { payers[x.uid] = true; });
+    const perPerson = rows.map(function (p) {
+      const list = paymentsOf(p.b), d = list.filter(function (x) { return lateBy(x) !== null; });
+      return { uid: p.uid, name: p.name, state: p.a.state, amount: p.a.state === 'open' ? Number(p.b.amount) || 0 : 0,
+        since: p.b.unlockedAt ? viennaDay(p.b.unlockedAt) : (list.length ? viennaDay(list[0].at) : ''),
+        payments: list.length, paid: sum(list, function (x) { return x.amount; }), lastPaid: list.length ? viennaDay(list[list.length - 1].at) : '',
+        onTime: d.length ? Math.round(100 * d.filter(function (x) { return lateBy(x) <= 0; }).length / d.length) : null,
+        due: p.a.state === 'open' ? p.a.due : null };
+    }).sort(function (x, y) { return (y.paid - x.paid) || (y.amount - x.amount) || String(x.name).localeCompare(String(y.name), 'de'); });
+    const counts = { total: rows.length, none: 0, trial: 0, trialOver: 0, open: 0, locked: 0 };
+    rows.forEach(function (p) { counts[p.a.state] = (counts[p.a.state] || 0) + 1; });
+    const totalPaid = sum(all, function (x) { return x.amount; });
+    return {
+      monthly: sum(open, function (p) { return p.b.amount; }), paying: open.length,
+      avgAmount: open.length ? Math.round(100 * sum(open, function (p) { return p.b.amount; }) / open.length) / 100 : 0,
+      totalPaid: totalPaid, paymentsCount: all.length, firstPayment: all.length ? all[0].day : '',
+      thisMonth: byMonth[11].sum, lastMonth: byMonth[10].sum, thisMonthKey: thisMonth, lastMonthKey: prevMonth,
+      perPayer: Object.keys(payers).length ? Math.round(100 * totalPaid / Object.keys(payers).length) / 100 : 0,
+      months: byMonth,
+      overdue: overdue, overdueSum: sum(overdue, function (x) { return x.amount; }),
+      upcoming: upcoming, upcomingSum: sum(upcoming, function (x) { return x.amount; }),
+      counts: counts,
+      funnel: { signedUp: rows.length, decided: decided.length, converted: converted.length, paying: open.length, left: left.length,
+        rate: decided.length ? Math.round(100 * converted.length / decided.length) : null,
+        keep: converted.length ? Math.round(100 * open.length / converted.length) : null },
+      punctuality: { count: dated.length, onTime: dated.length - late.length, rate: dated.length ? Math.round(100 * (dated.length - late.length) / dated.length) : null,
+        avgLate: late.length ? Math.round(10 * late.reduce(function (n, x) { return n + lateBy(x); }, 0) / late.length) / 10 : 0 },
+      perPerson: perPerson,
+      payments: all.slice().reverse()
+    };
+  }
+
   /* Reference for the bank transfer, so the admin can match payments. */
   function reference(name, email) {
     const who = String(name || '').trim() || String(email || '').split('@')[0];
@@ -105,7 +191,7 @@
 
   const api = { TRIAL_DAYS: TRIAL_DAYS, LATE_AFTER: LATE_AFTER, WARN_DAYS: WARN_DAYS, ms: ms, addDays: addDays, daysBetween: daysBetween,
     nextMonth: nextMonth, access: access, usable: usable, banner: banner, reminders: reminders, afterPayment: afterPayment,
-    reference: reference, euro: euro, longDate: longDate };
+    reference: reference, euro: euro, longDate: longDate, viennaDay: viennaDay, paymentsOf: paymentsOf, withPayment: withPayment, lateBy: lateBy, stats: stats };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.LumenBilling = api;
 })(typeof self !== 'undefined' ? self : this);

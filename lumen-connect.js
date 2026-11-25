@@ -19,7 +19,7 @@
     digital: 'Digitale Sicherheit', verkehr: 'Auto, Verkehr & Reisen', tech: 'Tech & Geräte', erklaert: 'Wie funktioniert das?',
     natur: 'Natur & Wissenschaft', geschichte: 'Geschichte & Politik', kultur: 'Geografie, Kultur & Sprache', denken: 'Denken & Kommunikation'
   };
-  const ADMIN_SECTIONS = ['overview', 'people', 'settings', 'facts', 'reports', 'weekly', 'usage', 'billing'];
+  const ADMIN_SECTIONS = ['overview', 'people', 'money', 'settings', 'facts', 'reports', 'weekly', 'usage', 'billing'];
   const INFO = {
     id: 'lumen', name: 'Lumen', contract: CONTRACT, description: 'Allgemeinwissen: jeden Tag ein paar Fakten, Quiz und Auffrischung.',
     icon: BASE + 'icon-180.png', app: BASE, admin: BASE + 'admin.html'
