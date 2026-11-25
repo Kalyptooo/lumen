@@ -19,7 +19,7 @@
     digital: 'Digitale Sicherheit', verkehr: 'Auto, Verkehr & Reisen', tech: 'Tech & Geräte', erklaert: 'Wie funktioniert das?',
     natur: 'Natur & Wissenschaft', geschichte: 'Geschichte & Politik', kultur: 'Geografie, Kultur & Sprache', denken: 'Denken & Kommunikation'
   };
-  const ADMIN_SECTIONS = ['overview', 'people', 'settings', 'facts', 'reports', 'weekly', 'usage'];
+  const ADMIN_SECTIONS = ['overview', 'people', 'settings', 'facts', 'reports', 'weekly', 'usage', 'billing'];
   const INFO = {
     id: 'lumen', name: 'Lumen', contract: CONTRACT, description: 'Allgemeinwissen: jeden Tag ein paar Fakten, Quiz und Auffrischung.',
     icon: BASE + 'icon-180.png', app: BASE, admin: BASE + 'admin.html'
@@ -61,6 +61,7 @@
     pending = (async function () {
       let auth, db, fb = null;
       if (!window.LumenUsage) await load(BASE + 'lumen-usage.js');
+      if (!window.LumenBilling) await load(BASE + 'lumen-billing.js');
       const fake = window.LumenCloud && window.LumenCloud.fake ? window.LumenCloud : null;
       if (fake) { auth = fake.auth; db = fake.db; }
       else {
@@ -103,20 +104,23 @@
     async function access() {
       const a = await db.doc('config/access').get();
       const d = a.exists ? (a.data() || {}) : {};
-      return { adminEmails: (d.adminEmails || []).map(norm), invited: (d.invited || []).map(norm), usage: d.usage || null,
+      return { adminEmails: (d.adminEmails || []).map(norm), usage: d.usage || null,
         events: Array.isArray(d.events) ? d.events : [], eventsSeenAt: d.eventsSeenAt || '' };
     }
 
     async function gather() {
       guard();
       const got = await Promise.all([access(), db.doc('config/public').get(), db.collection('members').get(), db.collection('digest').get(),
-        db.collection('push').get().catch(function () { return { docs: [] }; }), getJSON('data/manifest.json?t=' + Date.now())]);
+        db.collection('push').get().catch(function () { return { docs: [] }; }), getJSON('data/manifest.json?t=' + Date.now()),
+        db.collection('billing').get().catch(function () { return { docs: [] }; })]);
       const acc = got[0], pub = got[1].exists ? (got[1].data() || {}) : {};
       const members = {}, digests = {};
       got[2].docs.forEach(function (d) { members[d.id] = d.data() || {}; });
       got[3].docs.forEach(function (d) { digests[d.id] = d.data() || {}; });
       const pushOn = got[4].docs.filter(function (d) { const x = d.data() || {}; return x.enabled === true && !!x.token; }).length;
-      return { acc: acc, pub: pub, members: members, digests: digests, pushOn: pushOn, manifest: got[5] || {} };
+      const bills = {};
+      got[6].docs.forEach(function (d) { bills[d.id] = d.data() || {}; });
+      return { acc: acc, pub: pub, members: members, digests: digests, pushOn: pushOn, manifest: got[5] || {}, bills: bills };
     }
     function rowsOf(g) {
       return Object.keys(Object.assign({}, g.members, g.digests)).map(function (uid) {
@@ -127,10 +131,12 @@
           if (a && a.answered && a.pct !== null) { right += a.pct * a.answered / 100; total += a.answered; }
         });
         const admin = g.acc.adminEmails.indexOf(email) !== -1;
+        const pay = admin ? { state: 'admin' } : window.LumenBilling.access(g.bills[uid] || null, Date.now(), todayVienna());
         return {
           uid: uid, name: m.name || d.name || '', email: m.email || '', lastSeen: m.lastSeen || d.lastDay || '', streak: d.streak || 0,
           learned: d.seenCount || 0, answered: d.answered || 0, pct: total ? Math.round(100 * right / total) : null, due: d.dueCount || 0,
-          reports: (d.reports || []).length, active: d.activeDays || [], admin: admin, unlocked: admin || g.acc.invited.indexOf(email) !== -1,
+          reports: (d.reports || []).length, active: d.activeDays || [], admin: admin, unlocked: window.LumenBilling.usable(pay),
+          access: pay.state, amount: pay.state === 'open' ? pay.amount : null, nextPay: pay.state === 'open' ? pay.due : null,
           link: link('people', uid)
         };
       });
@@ -151,12 +157,9 @@
       const g = await wrap(gather());
       const rows = rowsOf(g), t = todayVienna(), week = addDays(t, -6);
       const name = function (r) { return r.name || r.email || 'Unbekannt'; };
-      const everyone = {};
-      g.acc.invited.concat(g.acc.adminEmails).forEach(function (e) { everyone[e] = true; });
-      const registered = {};
-      rows.forEach(function (r) { registered[norm(r.email)] = true; });
       const idle = rows.filter(function (r) { return r.unlocked && r.lastSeen && r.lastSeen < week; });
-      const waiting = Object.keys(everyone).filter(function (e) { return !registered[e]; });
+      const waiting = rows.filter(function (r) { return r.access === 'trialOver'; });
+      const unpaid = rows.filter(function (r) { return r.access === 'open' && r.nextPay && r.nextPay < t; });
       let right = 0, total = 0;
       rows.forEach(function (r) { if (r.pct !== null) { right += r.pct * r.answered / 100; total += r.answered; } });
       const best = rows.slice().sort(function (a, b) { return b.streak - a.streak; })[0];
@@ -194,16 +197,18 @@
       if (reports.length) attention.push({ level: 'warn', text: reports.length + ' offene Fehlermeldung' + (reports.length === 1 ? '' : 'en'), link: link('reports') });
       if (daysLeft !== null && daysLeft < 7) attention.push({ level: daysLeft < 3 ? 'alert' : 'warn', text: 'Fakten nur noch für ' + Math.max(0, daysLeft) + ' Tage', link: link('weekly') });
       if (runAge !== null && runAge > 8) attention.push({ level: 'warn', text: 'Wochenaufgabe lief seit ' + runAge + ' Tagen nicht', link: link('weekly') });
-      if (waiting.length) attention.push({ level: 'info', text: waiting.length + ' freigeschaltet, aber noch nicht registriert', link: link('people') });
+      if (waiting.length) attention.push({ level: 'warn', text: 'Wartet auf Freischaltung: ' + waiting.map(name).join(', '), link: link('billing') });
+      if (unpaid.length) attention.push({ level: 'warn', text: 'Zahlung offen: ' + unpaid.map(name).join(', '), link: link('billing') });
       if (idle.length) attention.push({ level: 'info', text: 'Länger als eine Woche nicht da: ' + idle.map(name).join(', '), link: link('people') });
 
       cache = {
         project: INFO, at: new Date().toISOString(), today: t,
         people: {
-          unlocked: Object.keys(everyone).length, registered: rows.length,
+          unlocked: rows.filter(function (r) { return r.unlocked; }).length, registered: rows.length,
           activeToday: rows.filter(function (r) { return r.lastSeen === t || r.active.indexOf(t) !== -1; }).length,
           active7: rows.filter(function (r) { return r.lastSeen >= week; }).length,
-          reminders: g.pushOn, idle: idle.map(name), waiting: waiting
+          reminders: g.pushOn, idle: idle.map(name), waiting: waiting.map(name), unpaid: unpaid.map(name),
+          monthly: rows.reduce(function (n, r) { return n + (r.amount || 0); }, 0)
         },
         learning: {
           learned: rows.reduce(function (s, r) { return s + r.learned; }, 0), answered: total, pct: total ? Math.round(100 * right / total) : null,
@@ -239,24 +244,33 @@
       changed();
       return 'Mitteilung entfernt.';
     }
-    async function invite(emails) {
-      guard();
-      const list = (Array.isArray(emails) ? emails : String(emails || '').split(/[\s,;]+/)).map(norm)
-        .filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
-      if (!list.length) throw fail('bad-input');
+    /* Payment (lumen-billing.js): find the person by e-mail; amounts and paydays are set on the admin page. */
+    async function personByEmail(email) {
+      const e = norm(email && email.email !== undefined ? email.email : email);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw fail('bad-input');
       const acc = await wrap(access());
-      const next = acc.invited.slice();
-      list.forEach(function (e) { if (next.indexOf(e) === -1) next.push(e); });
-      await wrap(db.doc('config/access').set({ invited: next }, { merge: true }));
-      changed();
-      return list.length === 1 ? 'Freigeschaltet.' : list.length + ' Adressen freigeschaltet.';
-    }
-    async function lock(email) {
-      guard();
-      const e = norm(email), acc = await wrap(access());
       if (acc.adminEmails.indexOf(e) !== -1) throw fail('not-here');
-      if (acc.invited.indexOf(e) === -1) return 'War schon gesperrt.';
-      await wrap(db.doc('config/access').set({ invited: acc.invited.filter(function (x) { return x !== e; }) }, { merge: true }));
+      const snap = await wrap(db.collection('members').get());
+      const hit = snap.docs.filter(function (d) { return norm((d.data() || {}).email) === e; })[0];
+      if (!hit) throw fail('bad-input');
+      return hit.id;
+    }
+    async function paid(email) {
+      guard();
+      const uid = await personByEmail(email);
+      const cur = await wrap(db.doc('billing/' + uid).get());
+      const b = cur.exists ? (cur.data() || {}) : {};
+      if (b.status !== 'open') throw fail('not-here');
+      const next = window.LumenBilling.afterPayment(b, todayVienna());
+      await wrap(db.doc('billing/' + uid).set({ nextPay: next, paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true }));
+      changed();
+      return 'Bezahlt. Nächster Zahltag: ' + window.LumenBilling.longDate(next) + '.';
+    }
+    async function lock(input) {
+      guard();
+      const uid = await personByEmail(input);
+      const message = String((input && input.message) || '').trim().slice(0, 400);
+      await wrap(db.doc('billing/' + uid).set({ status: 'locked', message: message, lockedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true }));
       changed();
       return 'Zugang gesperrt.';
     }
@@ -295,8 +309,8 @@
     const ACTIONS = [
       { id: 'notice', label: 'Mitteilung an alle', input: 'text', hint: 'Erscheint oben auf „Heute“, max. 400 Zeichen', run: setNotice },
       { id: 'clearNotice', label: 'Mitteilung entfernen', input: null, run: clearNotice },
-      { id: 'invite', label: 'Personen freischalten', input: 'emails', hint: 'Eine oder mehrere E-Mail-Adressen', run: invite },
-      { id: 'lock', label: 'Zugang sperren', input: 'email', hint: 'Nicht für Admins; das geht nur auf der Admin-Seite', confirm: true, run: lock }
+      { id: 'paid', label: 'Zahlung erhalten', input: 'email', hint: 'Schiebt den Zahltag einen Monat weiter', confirm: true, run: paid },
+      { id: 'lock', label: 'Zugang sperren', input: 'email', hint: 'E-Mail oder { email, message }; die Nachricht sieht die Person beim Öffnen. Nicht für Admins.', confirm: true, run: lock }
     ];
     function run(id, input) {
       const a = ACTIONS.filter(function (x) { return x.id === id; })[0];

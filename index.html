@@ -321,6 +321,10 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
 }
 [hidden] { display: none !important; }
 .notice { margin-bottom: 14px; border-color: var(--accent); }
+.billnote.warn { border-color: #d97706; }
+.billbox { margin: 14px 0; }
+.billrow { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.billrow span { color: var(--muted); }
 .notice .label { margin: 0; color: var(--accent); }
 .daybar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin: 2px 0 14px; }
 .seg-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 52px; padding: 8px 10px; border: 0; border-radius: 12px; background: var(--surface-2); color: var(--muted); font-size: .8125rem; text-align: left; }
@@ -625,6 +629,7 @@ details.more { border-top: .5px solid var(--line); }
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="lumen-cloud.js"></script>
+<script src="lumen-billing.js"></script>
 <script id="lumen-logic">
 /* Lumen logic: pure functions only (no DOM, no storage, no network).
    Tested by tests/logic.test.mjs, which reads this block from index.html. */
@@ -1273,6 +1278,7 @@ details.more { border-top: .5px solid var(--line); }
   'use strict';
   const L = window.LumenLogic;
   const C = window.LumenCloud;
+  const B = window.LumenBilling;
   const PAGE_URL = location.href.split('#')[0].split('?')[0];
   const $ = function (id) { return document.getElementById(id); };
   const svg = function (inner, cls, box) { return '<svg' + (cls ? ' class="' + cls + '"' : '') + ' viewBox="0 0 ' + (box || '24 24') + '" aria-hidden="true">' + inner + '</svg>'; };
@@ -1576,6 +1582,13 @@ details.more { border-top: .5px solid var(--line); }
     S.phase = 'loading';
     render();
     startTimer();
+    loadBilling().then(function () {
+      if (S.uid !== user.uid) return;
+      if (!B.usable(billState())) { lockOut(); return; }
+      startLoading();
+    });
+  }
+  function startLoading() {
     subPrivate();
     // The admin's settings (corrections, notice, default times) come first, so facts are shown corrected.
     S.db.doc('config/public').get().then(function (snap) { S.pub = snap.exists ? (snap.data() || {}) : {}; }, function () { S.pub = {}; })
@@ -1605,6 +1618,44 @@ details.more { border-top: .5px solid var(--line); }
       scheduleRender();
     };
   }
+  /* ---------- access: free days, unlock by the admin, payment (lumen-billing.js; the real lock is in firestore.rules) ---------- */
+
+  const serverTime = function () { return C.firebase && C.firebase.firestore ? C.firebase.firestore.FieldValue.serverTimestamp() : nowISO(); };
+  const billState = function () { return S.bill ? B.access(S.bill, Date.now(), today()) : { state: 'none' }; };
+  function loadBilling() {
+    const ref = S.db.doc('billing/' + S.uid);
+    const cfg = S.db.doc('config/billing').get().then(function (s) { S.billCfg = s.exists ? (s.data() || {}) : {}; }, function () { S.billCfg = S.billCfg || {}; });
+    const own = ref.get().then(function (s) {
+      if (s.exists) { S.bill = s.data() || {}; return null; }
+      // First visit: the free days start now (server time). The rules accept this exactly once.
+      return cfg.then(function () {
+        const days = Number.isInteger(S.billCfg.trialDays) ? S.billCfg.trialDays : B.TRIAL_DAYS;
+        S.bill = { status: 'trial', trialStart: nowISO(), trialDays: days };
+        return ref.set({ status: 'trial', trialStart: serverTime(), trialDays: days });
+      });
+    }).catch(function () { /* older rules or offline: the database decides anyway */ });
+    // Never wait long: offline the app opens from its own copy.
+    return Promise.race([Promise.all([own, cfg]), new Promise(function (r) { setTimeout(r, 4000); })]);
+  }
+  function lockOut() {
+    stopSubs();
+    S.phase = 'denied';
+    if (S.sheets.length) S.sheets.slice().forEach(closeSheet);
+    render();
+  }
+  /* While the app is open the free days can run out; checked with the clock. */
+  function checkAccess() {
+    if (S.phase === 'ready' && S.bill && !B.usable(billState())) lockOut();
+  }
+  function billBanner() {
+    const a = billState(), b = B.banner(a);
+    if (!b) return null;
+    const cfg = S.billCfg || {};
+    const bank = a.state === 'open' && cfg.showBank && cfg.iban;
+    return h('div', { class: 'card notice billnote' + (b.level === 'warn' ? ' warn' : '') }, h('p', { class: 'text', text: b.text }),
+      bank ? h('p', { class: 'hint', text: 'An ' + (cfg.holder || 'den Admin') + ', IBAN ' + cfg.iban + ', Verwendungszweck: ' + B.reference(firstName() || (S.authUser && S.authUser.displayName), S.authUser && S.authUser.email) }) : null);
+  }
+
   function subPrivate() {
     if (S.unsub.priv) S.unsub.priv();
     S.dead.priv = false;
@@ -1647,7 +1698,7 @@ details.more { border-top: .5px solid var(--line); }
     S.db.doc('members/' + S.uid).set({
       email: u.email || '', name: u.displayName || '', lastSeen: today(), lastSeenAt: nowISO()
     }, { merge: true }).catch(function () { memberDone = false; });
-    if (settings().push === true) savePushTimes();
+    if (settings().push === true) refreshPush();
     if (C.forwardReports) C.forwardReports().catch(function () { /* only admins may forward */ });
   }
   function loadSide() {
@@ -1788,11 +1839,25 @@ details.more { border-top: .5px solid var(--line); }
       btn('Abmelden', 'link', signOut));
   }
   function deniedCard() {
-    const u = S.authUser;
-    return h('div', { class: 'card' }, h('h2', { class: 'title', text: 'Noch nicht freigeschaltet' }),
-      h('p', { class: 'lead', text: 'Dein Konto ' + (u ? u.email : '') + ' ist angelegt, aber noch nicht für Lumen freigeschaltet. Bitte den Admin, deine E-Mail-Adresse freizuschalten.' }),
+    const u = S.authUser, a = billState(), cfg = S.billCfg || {};
+    const locked = a.state === 'locked', over = a.state === 'trialOver';
+    const amount = S.bill && Number(S.bill.amount) > 0 ? B.euro(S.bill.amount) : '';
+    const row = function (label, value) { return value ? h('div', { class: 'billrow' }, h('span', { text: label }), h('b', { text: value })) : null; };
+    return h('div', { class: 'card' },
+      h('h2', { class: 'title', text: locked ? 'Dein Zugang ist gesperrt' : over ? 'Deine Gratis-Zeit ist vorbei' : 'Noch nicht freigeschaltet' }),
+      h('p', { class: 'lead', text: locked ? 'Melde dich beim Admin, damit er deinen Zugang wieder freischaltet.'
+        : over ? 'Schön, dass du Lumen ausprobiert hast. Damit du weiterlernen kannst, melde dich beim Admin. Er schaltet deinen Zugang frei.'
+          : 'Dein Konto ' + (u ? u.email : '') + ' ist angelegt, aber noch nicht für Lumen freigeschaltet. Melde dich beim Admin.' }),
+      a.message ? h('div', { class: 'card notice' }, h('p', { class: 'label', text: 'Nachricht vom Admin' }), h('p', { class: 'text', text: a.message })) : null,
+      h('p', { class: 'text', text: 'Wenn du den Admin kennst, sprich ihn am besten persönlich an.' }),
+      cfg.contactEmail ? h('p', { class: 'text' }, 'Sonst per E-Mail: ', h('a', { href: 'mailto:' + cfg.contactEmail, text: cfg.contactEmail })) : null,
+      cfg.showBank && cfg.iban ? h('div', { class: 'section billbox' }, h('p', { class: 'label', text: 'Überweisung' }),
+        row('An', cfg.holder), row('IBAN', cfg.iban), row('Betrag', amount),
+        row('Verwendungszweck', B.reference(u && u.displayName, u && u.email))) : null,
+      h('p', { class: 'hint', text: 'Dein Lernstand bleibt gespeichert. Sobald du freigeschaltet bist, geht es genau dort weiter.' }),
       btn('Erneut prüfen', 'primary', function () { location.reload(); }),
-      btn('Abmelden', 'link', signOut));
+      btn('Abmelden', 'link', signOut),
+      btn('Konto löschen', 'link', openDeleteAccount));
   }
 
   /* ---------- facts ---------- */
@@ -2002,6 +2067,8 @@ details.more { border-top: .5px solid var(--line); }
   function renderToday() { paint($('viewToday'), buildToday); }
   function buildToday(root) {
     if (S.phase !== 'ready' || !S.seen.win) { root.appendChild(stateCard()); return; }
+    const billNote = billBanner();
+    if (billNote) root.appendChild(billNote);
     const notice = S.pub && S.pub.notice;
     if (notice && notice.text && notice.at !== settings().noticeSeen) {
       root.appendChild(h('div', { class: 'card notice' }, h('p', { class: 'text', text: notice.text }),
@@ -2576,6 +2643,36 @@ details.more { border-top: .5px solid var(--line); }
     });
     sheet.onclose = function () { writePriv('settings', { pushAsked: true }); };
   }
+  async function loadMessaging() {
+    if (C.messaging) return;
+    await new Promise(function (resolve, reject) {
+      const sc = document.createElement('script');
+      sc.src = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js';
+      sc.onload = resolve; sc.onerror = reject;
+      document.head.appendChild(sc);
+    });
+    try {
+      const ok = !C.firebase.messaging.isSupported || await C.firebase.messaging.isSupported();
+      C.messaging = ok ? C.firebase.app().messaging() : null;
+    } catch (e) { C.messaging = null; }
+    if (!C.messaging) throw new Error('unsupported');
+  }
+  /* The address of this phone for reminders. It can change or expire (iOS does that), so it is renewed on every visit. */
+  async function registerDevice() {
+    const reg = await navigator.serviceWorker.ready;
+    const token = await C.messaging.getToken({ vapidKey: self.LUMEN_VAPID, serviceWorkerRegistration: reg });
+    await S.db.doc('push/' + S.uid).set({ token: token, enabled: true, times: times(), counts: planCfg().counts, updatedAt: nowISO() }, { merge: true });
+  }
+  async function refreshPush() {
+    const can = standalone() && 'Notification' in window && 'serviceWorker' in navigator && C.firebase;
+    if (can && Notification.permission === 'denied') { writePriv('settings', { push: false }); return; }
+    if (!can || Notification.permission !== 'granted') { savePushTimes(); return; }
+    try { await loadMessaging(); await registerDevice(); } catch (e) { savePushTimes(); }
+  }
+  function sendTestPush(redraw) {
+    S.db.doc('push/' + S.uid).set({ test: true, updatedAt: nowISO() }, { merge: true })
+      .then(function () { toast('Die Test-Erinnerung kommt in den nächsten 15 Minuten.'); redraw(); }, function () { toast('Das hat gerade nicht geklappt.'); });
+  }
   async function enablePush(redraw) {
     if (pushBusy) return;
     pushBusy = true; redraw();
@@ -2583,24 +2680,10 @@ details.more { border-top: .5px solid var(--line); }
       if (!('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
       /* Ask right away, before anything is loaded: iOS only shows the question during the tap itself. */
       const asked = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
-      if (!C.messaging) {
-        await new Promise(function (resolve, reject) {
-          const sc = document.createElement('script');
-          sc.src = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js';
-          sc.onload = resolve; sc.onerror = reject;
-          document.head.appendChild(sc);
-        });
-        try {
-          const ok = !C.firebase.messaging.isSupported || await C.firebase.messaging.isSupported();
-          C.messaging = ok ? C.firebase.app().messaging() : null;
-        } catch (e) { C.messaging = null; }
-        if (!C.messaging) throw new Error('unsupported');
-      }
+      await loadMessaging();
       const perm = await asked;
       if (perm !== 'granted') { toast('Ohne deine Erlaubnis kann Lumen nicht erinnern. Du kannst sie in den iPhone-Einstellungen bei Lumen erteilen.'); pushBusy = false; redraw(); return; }
-      const reg = await navigator.serviceWorker.ready;
-      const token = await C.messaging.getToken({ vapidKey: self.LUMEN_VAPID, serviceWorkerRegistration: reg });
-      await S.db.doc('push/' + S.uid).set({ token: token, enabled: true, times: times(), counts: planCfg().counts, updatedAt: nowISO() }, { merge: true });
+      await registerDevice();
       writePriv('settings', { push: true });
       toast('Erinnerungen sind an.');
     } catch (e) {
@@ -2628,6 +2711,7 @@ details.more { border-top: .5px solid var(--line); }
       h('p', { class: 'hint', text: on
         ? 'Lumen erinnert dich um ' + t.morgen + ', ' + t.mittag + ' und ' + t.abend + ' Uhr, wenn die Etappe noch offen ist. Die Uhrzeiten änderst du oben bei den Etappen.'
         : 'Lumen kann dich zu den drei Etappen erinnern, aber nur, wenn noch etwas offen ist.' + (standalone() ? '' : ' Dafür musst du Lumen zuerst zum Home-Bildschirm hinzufügen und von dort öffnen.') }),
+      on ? btn('Test-Erinnerung schicken', 'secondary', function () { sendTestPush(redraw); }) : null,
       on ? btn('Erinnerungen ausschalten', 'secondary', function () { disablePush(redraw); })
         : btn(pushBusy ? 'Einen Moment …' : 'Erinnerungen einschalten', 'primary', function () { enablePush(redraw); }, pushBusy || !standalone()));
   }
@@ -2729,7 +2813,9 @@ details.more { border-top: .5px solid var(--line); }
             }
             stopSubs();
             const del = function (p) { return S.db.doc(p).delete().catch(function () {}); };
-            await Promise.all(Object.keys(S.server).map(function (k) { return del('data/users/' + S.uid + '/' + k); })
+            let own = Object.keys(S.server);
+            if (!own.length) { try { own = (await S.db.collection('data/users/' + S.uid).get()).docs.map(function (d) { return d.id; }); } catch (e) { /* nothing stored */ } }
+            await Promise.all(own.map(function (k) { return del('data/users/' + S.uid + '/' + k); })
               .concat([del('digest/' + S.uid), del('members/' + S.uid), del('friends/' + S.uid), del('push/' + S.uid)]));
             await u.delete();
             try { localStorage.removeItem('lumen-theme'); } catch (e) { /* ignore */ }
@@ -3205,6 +3291,7 @@ details.more { border-top: .5px solid var(--line); }
   });
   function clock() {
     S.now = new Date();
+    checkAccess();
     const p = parts();
     if (S.phase === 'ready' && S.winDay && p.date !== S.winDay) {
       if (S.flow && S.flow.type === 'read') S.flow = null;

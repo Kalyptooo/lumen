@@ -107,13 +107,13 @@ button:disabled { opacity: .5; }
     try { s = await lumen.summary(); } catch (e) { show(head(''), h('p', { class: 'msg err', text: e.message })); return; }
     const max = Math.max.apply(null, s.learning.perDay.map(function (d) { return d.active; }).concat([1]));
     const notice = h('textarea', { maxlength: '400', placeholder: s.notice.text ? 'Aktuell: ' + s.notice.text : 'Mitteilung an alle' });
-    const invite = h('input', { type: 'email', placeholder: 'E-Mail-Adresse(n)' });
+    const payer = h('input', { type: 'email', placeholder: 'E-Mail-Adresse' });
     const refresh = function () { lumen.summary({ force: true }).then(draw); };
-    const n = action('notice', notice, refresh), c = action('clearNotice', null, refresh), inv = action('invite', invite, refresh);
+    const n = action('notice', notice, refresh), c = action('clearNotice', null, refresh), inv = action('paid', payer, refresh);
     show(
       head('Stand ' + new Date(s.at).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })),
       h('div', { class: 'kpis' },
-        [[s.people.activeToday, 'heute aktiv'], [s.people.active7, 'in 7 Tagen aktiv'], [s.people.unlocked, 'freigeschaltet'],
+        [[s.people.activeToday, 'heute aktiv'], [s.people.active7, 'in 7 Tagen aktiv'], [s.people.unlocked, 'mit Zugang'], [s.people.monthly + ' €', 'pro Monat'],
           [s.people.reminders, 'mit Erinnerungen'], [s.learning.pct === null ? '–' : s.learning.pct + ' %', 'Trefferquote'],
           [s.content.daysLeft === null ? '–' : s.content.daysLeft + ' T.', 'Fakten reichen']].map(function (k) {
           return h('div', { class: 'kpi' }, h('b', { text: String(k[0]) }), h('span', { text: k[1] }));
@@ -131,8 +131,8 @@ button:disabled { opacity: .5; }
       })) : h('p', { class: 'msg', text: 'Keine neuen Meldungen.' }),
       s.inbox.unseen ? h('div', { class: 'row' }, h('button', { type: 'button', class: 'quiet', text: 'Alles gelesen', onclick: function () { lumen.markSeen().then(refresh); } })) : null,
       h('p', { class: 'label', text: 'Mitteilung an alle' }), notice, h('div', { class: 'row' }, n.button, s.notice.text ? c.button : null), n.msg, c.msg,
-      h('p', { class: 'label', text: 'Personen freischalten' }), invite, h('div', { class: 'row' }, inv.button), inv.msg,
-      h('div', { class: 'row' }, h('a', { href: lumen.link('people'), target: '_blank', rel: 'noopener', text: 'Personen verwalten ↗' }),
+      h('p', { class: 'label', text: 'Zahlung erhalten' }), payer, h('div', { class: 'row' }, inv.button), inv.msg,
+      h('div', { class: 'row' }, h('a', { href: lumen.link('billing'), target: '_blank', rel: 'noopener', text: 'Monetarisierung ↗' }),
         h('a', { href: lumen.link('facts'), target: '_blank', rel: 'noopener', text: 'Fakten bearbeiten ↗' }),
         h('button', { type: 'button', class: 'quiet', text: 'Aktualisieren', onclick: refresh }))
     );

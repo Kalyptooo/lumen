@@ -37,7 +37,7 @@ Mit dem Lumen-Admin-Konto, einmal pro Gerät. Die Anmeldung bleibt gespeichert.
 {
   project:  { id, name, icon, app, admin, contract },
   at, today,
-  people:   { unlocked, registered, activeToday, active7, reminders, idle: [Namen], waiting: [E-Mails] },
+  people:   { unlocked, registered, activeToday, active7, reminders, idle: [Namen], waiting: [Namen], unpaid: [Namen], monthly /* € */ },
   learning: { learned, answered, pct, bestStreak: { name, days }, perDay: [{ date, active }] /* 14 Tage */,
               areas: [{ key, name, read, pct }] },
   reports:  { open, items: [{ factId, note, reportedAt }] },
@@ -58,7 +58,9 @@ Mit dem Lumen-Admin-Konto, einmal pro Gerät. Die Anmeldung bleibt gespeichert.
 - Personen waren länger als eine Woche nicht da
 - eine kostenlose Grenze wird knapp, oder die stündliche Messung der Auslastung fehlt
 
-`lumen.people()` gibt die Personenliste zurück, die zuletzt Aktiven zuerst: `uid, name, email, lastSeen, streak, learned, answered, pct, due, reports, admin, unlocked, link`.
+`lumen.people()` gibt die Personenliste zurück, die zuletzt Aktiven zuerst: `uid, name, email, lastSeen, streak, learned, answered, pct, due, reports, admin, unlocked, access, amount, nextPay, link`.
+
+`access` ist der Stand beim Bezahlen (siehe `lumen-billing.js`): `none`, `admin`, `trial` (Gratis-Zeit), `trialOver` (wartet auf Freischaltung), `open` (freigeschaltet) oder `locked` (gesperrt). `waiting` sind alle mit `trialOver`, `unpaid` alle, deren Zahltag vorbei ist.
 
 **Kosten:** Ein frischer Abruf liest etwa 3 Einträge pro Person aus der Datenbank, bei 20 Personen also rund 60. Der kostenlose Tarif erlaubt 50.000 pro Tag. Lädt das Dashboard höchstens alle 5 Minuten neu, bleibt es weit darunter.
 
@@ -70,8 +72,10 @@ Mit dem Lumen-Admin-Konto, einmal pro Gerät. Die Anmeldung bleibt gespeichert.
 | --- | --- | --- |
 | `notice` | Text (max. 400 Zeichen) | Mitteilung an alle oben auf „Heute“ |
 | `clearNotice` | – | Mitteilung entfernen |
-| `invite` | eine oder mehrere E-Mails | Personen freischalten |
-| `lock` | E-Mail | Zugang sperren (nicht für Admins) |
+| `paid` | E-Mail | Zahlung erhalten: der Zahltag rückt einen Monat weiter |
+| `lock` | E-Mail oder `{ email, message }` | Zugang sperren, mit Nachricht an die Person (nicht für Admins) |
+
+Freischalten mit Betrag und Zahltag geht nur auf der Admin-Seite (`lumen.link('billing', uid)`).
 
 Bewusst **nicht** im Anschluss sind die folgenden Aktionen. Sie gibt es nur auf der Admin-Seite:
 
