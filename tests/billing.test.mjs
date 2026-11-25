@@ -71,4 +71,46 @@ test('transfer reference', () => {
   assert.equal(B.reference('Anna', 'a@b.at'), 'Lumen Anna');
   assert.equal(B.reference('', 'max.muster@b.at'), 'Lumen max.muster');
 });
+test('payment log: kept short, amounts rounded, lateness', () => {
+  let b = {};
+  for (let i = 0; i < 130; i += 1) b = { payments: B.withPayment(b, '2026-11-25T10:00:00Z', 1.005, '2026-11-20') };
+  assert.equal(b.payments.length, 120);
+  assert.equal(B.lateBy(b.payments[0]), 5);
+  assert.equal(B.lateBy({ at: '2026-11-19T23:30:00Z', due: '2026-11-20' }), 0); // 00:30 in Vienna: on the payday
+  assert.equal(B.lateBy({ at: '2026-11-19T10:00:00Z', due: null }), null);
+});
+test('statistics: income, overdue, upcoming, conversion, punctuality', () => {
+  const p = (uid, b) => ({ uid, name: uid, b, a: B.access(b, NOW, T) });
+  const people = [
+    p('admin', { admin: true, status: 'open' }),
+    p('anna', { status: 'open', amount: 2, nextPay: '2026-12-01', unlockedAt: '2026-10-01T10:00:00Z',
+      payments: [{ at: '2026-10-01T10:00:00Z', amount: 2, due: '2026-10-01' }, { at: '2026-11-03T10:00:00Z', amount: 2, due: '2026-11-01' }] }),
+    p('berta', { status: 'open', amount: 3, nextPay: '2026-11-20', payments: [{ at: '2026-11-25T08:00:00Z', amount: 3, due: '2026-10-20' }] }),
+    p('carl', { status: 'trial', trialStart: '2026-11-25T08:00:00Z', trialDays: 3 }),
+    p('dora', { status: 'trial', trialStart: '2026-11-01T08:00:00Z', trialDays: 3 }),
+    p('emil', { status: 'locked', unlockedAt: '2026-09-01T10:00:00Z', payments: [{ at: '2026-09-01T10:00:00Z', amount: 1, due: '2026-09-01' }] })
+  ];
+  const s = B.stats(people, T);
+  assert.equal(s.monthly, 5);
+  assert.equal(s.paying, 2);
+  assert.equal(s.totalPaid, 8);
+  assert.equal(s.paymentsCount, 4);
+  assert.equal(s.thisMonth, 5);
+  assert.equal(s.lastMonth, 2);
+  assert.equal(s.months.length, 12);
+  assert.equal(s.months[11].month, '2026-11');
+  assert.deepEqual(s.overdue.map((x) => [x.uid, x.days]), [['berta', 5]]);
+  assert.equal(s.overdueSum, 3);
+  assert.deepEqual(s.upcoming.map((x) => [x.uid, x.inDays]), [['anna', 6]]);
+  assert.deepEqual(s.funnel, { signedUp: 5, decided: 4, converted: 3, paying: 2, left: 1, rate: 75, keep: 67 });
+  assert.equal(s.counts.trial, 1);
+  assert.equal(s.counts.trialOver, 1);
+  assert.equal(s.punctuality.count, 4);
+  assert.equal(s.punctuality.onTime, 2);
+  assert.equal(s.punctuality.avgLate, 19);
+  assert.equal(s.perPerson[0].uid, 'anna');
+  assert.equal(s.perPerson[0].onTime, 50);
+  assert.equal(s.payments[0].uid, 'berta');
+  assert.ok(!s.perPerson.some((x) => x.uid === 'admin'));
+});
 console.log(n + ' Tests bestanden.');
