@@ -125,7 +125,9 @@
       out.auth = app.auth();
       out.auth.languageCode = 'de';
       out.db = app.firestore();
-      out.db.enablePersistence({ synchronizeTabs: true }).catch(function () { /* private mode or old browser: works online only */ });
+      // One tab keeps the offline copy; further tabs work online only. (Shared tabs sent every write through one tab, and
+      // when that tab slept in the background, writes such as the start of the free days got stuck.)
+      out.db.enablePersistence().catch(function () { /* another tab, private mode or old browser: works online only */ });
       try { out.messaging = fb.messaging && (!fb.messaging.isSupported || fb.messaging.isSupported()) ? app.messaging() : null; } catch (e) { out.messaging = null; }
       out.ready = true;
     }

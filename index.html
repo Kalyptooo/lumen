@@ -1629,9 +1629,32 @@ details.more { border-top: .5px solid var(--line); }
     if (S.fresh.priv && S.fresh.win) { clearTimeout(S.loadTimer); S.stale = false; }
     scheduleRender();
   }
+  /* A refused read right at the start often only means the free days are still on their way to the database.
+     Look again once, a moment later, before showing the lock screen. */
+  function deniedOnce() {
+    if (S.retryDenied === 'done' || !S.uid) return false;
+    if (S.retryDenied !== 'pending') {
+      S.retryDenied = 'pending';
+      setTimeout(function () {
+        const user = C.auth.currentUser;
+        if (!user) { location.reload(); return; }
+        freshToken(user).then(loadBilling).then(function () {
+          S.retryDenied = 'done';
+          if (!B.usable(billState())) { lockOut(); return; }
+          stopSubs();
+          S.phase = 'loading';
+          render();
+          startTimer();
+          startLoading();
+        });
+      }, 2500);
+    }
+    return true;
+  }
   function failed(name) {
     return function (e) {
       S.dead[name] = true;
+      if (e && e.code === 'permission-denied' && deniedOnce()) return;
       if (e && e.code === 'permission-denied') { S.phase = 'denied'; clearTimeout(S.loadTimer); }
       else if (S.phase === 'ready') S.stale = true;
       else if (S.phase === 'loading') { S.phase = 'error'; clearTimeout(S.loadTimer); }
@@ -1645,9 +1668,11 @@ details.more { border-top: .5px solid var(--line); }
   function loadBilling() {
     const ref = S.db.doc('billing/' + S.uid);
     const cfg = S.db.doc('config/billing').get().then(function (s) { S.billCfg = s.exists ? (s.data() || {}) : {}; }, function () { S.billCfg = S.billCfg || {}; });
+    let creating = false;
     const own = ref.get().then(function (s) {
       if (s.exists) { S.bill = s.data() || {}; return null; }
       // First visit: the free days start now (server time). The rules accept this exactly once.
+      creating = true;
       return cfg.then(function () {
         const days = Number.isInteger(S.billCfg.trialDays) ? S.billCfg.trialDays : B.TRIAL_DAYS;
         S.bill = { status: 'trial', trialStart: nowISO(), trialDays: days };
@@ -1657,8 +1682,13 @@ details.more { border-top: .5px solid var(--line); }
       // Offline the database decides anyway. A refusal here means the free days could not start: say so on the lock screen.
       if (e && e.code === 'permission-denied') S.billFailed = true;
     });
-    // Never wait long: offline the app opens from its own copy.
-    return Promise.race([Promise.all([own, cfg]), new Promise(function (r) { setTimeout(r, 4000); })]);
+    // Never wait long: offline the app opens from its own copy. But the very first record must reach the database before
+    // the app reads anything, or every read is refused: then wait up to 20 seconds.
+    const started = Date.now();
+    const timer = new Promise(function (r) {
+      setTimeout(function check() { if (creating && Date.now() - started < 20000) setTimeout(check, 500); else r(); }, 4000);
+    });
+    return Promise.race([Promise.all([own, cfg]), timer]);
   }
   function lockOut() {
     stopSubs();
