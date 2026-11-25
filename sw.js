@@ -2,7 +2,7 @@
    - Offline: pages, scripts and content are served from the network when possible and from the cache otherwise.
    - Reminders: shows the notifications that tools/send-reminders.mjs sends through Firebase Cloud Messaging.
      Every push shows a notification, also while Lumen is open: iOS cancels the reminders of apps that receive pushes without showing one. */
-const CACHE = 'lumen-v17';
+const CACHE = 'lumen-v18';
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const SHELL = ['./', 'index.html', 'lumen-cloud.js', 'lumen-billing.js', 'lumen-touch.js', 'firebase-config.js', 'manifest.webmanifest', 'icon-180.png', 'icon.svg',
   SDK + 'firebase-app-compat.js', SDK + 'firebase-auth-compat.js', SDK + 'firebase-firestore-compat.js', SDK + 'firebase-messaging-compat.js'];

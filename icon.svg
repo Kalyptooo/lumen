@@ -1,5 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<rect width="100" height="100" rx="22" fill="#FF9F0A"/>
-<path fill="#fff" d="M41 65C41 58 31 54 31 42a19 19 0 0 1 38 0c0 12-10 16-10 23z"/>
-<rect x="41" y="70" width="18" height="7" rx="3.5" fill="#fff"/>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFBE3D"/><stop offset="1" stop-color="#FF7A00"/></linearGradient>
+<radialGradient id="glow" cx="50" cy="42.5" r="32" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".6" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<linearGradient id="g" x1="0" y1="25" x2="0" y2="72.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#FFF1D6"/></linearGradient>
+<filter id="s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.5" flood-color="#8A3A00" flood-opacity=".3"/></filter>
+</defs>
+<rect width="100" height="100" rx="22.5" fill="url(#bg)"/>
+<circle cx="50" cy="42.5" r="32" fill="url(#glow)"/>
+<g fill="url(#g)" filter="url(#s)">
+<path d="M43 63C43 57.5 32.5 54 32.5 42.5a17.5 17.5 0 0 1 35 0c0 11.5-10.5 15-10.5 20.5z"/>
+<rect x="43" y="66.5" width="14" height="6" rx="3"/>
+</g>
 </svg>

@@ -105,7 +105,8 @@
       const a = await db.doc('config/access').get();
       const d = a.exists ? (a.data() || {}) : {};
       return { adminEmails: (d.adminEmails || []).map(norm), usage: d.usage || null,
-        events: Array.isArray(d.events) ? d.events : [], eventsSeenAt: d.eventsSeenAt || '' };
+        events: Array.isArray(d.events) ? d.events : [], eventsSeenAt: d.eventsSeenAt || '',
+        removedReports: Array.isArray(d.removedReports) ? d.removedReports : [] };
     }
 
     async function gather() {
@@ -143,10 +144,11 @@
     }
     function openReports(g) {
       const until = g.manifest.reportsHandledUntil || '';
+      const removed = g.acc.removedReports || [];
       const out = [];
       Object.keys(g.digests).forEach(function (uid) {
         (g.digests[uid].reports || []).forEach(function (r) {
-          if (r && r.reportedAt && !(until && r.reportedAt <= until)) out.push({ factId: String(r.factId || ''), note: String(r.note || ''), reportedAt: r.reportedAt });
+          if (r && r.reportedAt && !(until && r.reportedAt <= until) && removed.indexOf(r.factId + '|' + r.reportedAt) === -1) out.push({ factId: String(r.factId || ''), note: String(r.note || ''), reportedAt: r.reportedAt });
         });
       });
       return out.sort(function (a, b) { return a.reportedAt < b.reportedAt ? 1 : -1; });

@@ -170,6 +170,7 @@ body.modal-open { overflow: hidden; }
   .sheet { border-radius: 0; min-height: 100%; padding: max(14px, calc(env(safe-area-inset-top, 0px) + 10px)) 14px calc(env(safe-area-inset-bottom, 0px) + 24px); }
   .todo { flex-wrap: wrap; }
 }
+.row.nowrap { flex-wrap: nowrap; }
 .usage-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 </style>
 </head>
@@ -343,9 +344,25 @@ body.modal-open { overflow: hidden; }
   function allReports() {
     const out = [];
     Object.keys(S.digests).forEach(function (uid) {
-      (S.digests[uid].reports || []).forEach(function (r) { out.push(Object.assign({ uid: uid }, r)); });
+      (S.digests[uid].reports || []).forEach(function (r) { if (!removedReport(r)) out.push(Object.assign({ uid: uid }, r)); });
     });
     return out.sort(function (a, b) { return String(a.reportedAt) < String(b.reportedAt) ? 1 : -1; });
+  }
+  /* A report the admin removed stays in the person's own data, but disappears everywhere else (list, counts, weekly task). */
+  const reportKey = function (r) { return r.factId + '|' + r.reportedAt; };
+  const removedReport = function (r) { return (S.access.removedReports || []).indexOf(reportKey(r)) !== -1; };
+  async function removeReport(r) {
+    const k = reportKey(r);
+    S.busy = true; render();
+    try {
+      const list = (S.access.removedReports || []).filter(function (x) { return x !== k; }).concat([k]).slice(-500);
+      await C.db.doc('config/access').set({ removedReports: list }, { merge: true });
+      S.access.removedReports = list;
+      const pub = (S.pub.reports || []).filter(function (x) { return reportKey(x) !== k; });
+      if (pub.length !== (S.pub.reports || []).length) { await C.db.doc('config/public').set({ reports: pub, updatedAt: nowISO() }, { merge: true }); S.pub.reports = pub; }
+      toast('Meldung entfernt.');
+    } catch (e) { toast('Entfernen hat nicht geklappt: ' + errText(e)); }
+    S.busy = false; render();
   }
   const handled = function (r) { const u = S.manifest && S.manifest.reportsHandledUntil; return !!(u && r.reportedAt && r.reportedAt <= u); };
   const forwarded = function (r) { return (S.pub.reports || []).some(function (x) { return x.factId === r.factId && x.reportedAt === r.reportedAt; }); };
@@ -1070,7 +1087,11 @@ body.modal-open { overflow: hidden; }
           return h('tr', {}, h('td', { text: fmtDay(r.reportedAt) }), h('td', { text: S.titles[r.factId] || r.factId }), h('td', { text: r.note || '–' }),
             h('td', { text: who.name || who.email || '–' }),
             h('td', {}, h('span', { class: 'tag' + (handled(r) ? '' : ' warn'), text: handled(r) ? 'bearbeitet' : (forwarded(r) ? 'weitergegeben' : 'neu') })),
-            h('td', {}, btn('Fakt öffnen', 'secondary small', function () { S.tab = 'facts'; openDay(String(r.factId).slice(0, 10)); })));
+            h('td', {}, h('div', { class: 'row nowrap' }, btn('Fakt öffnen', 'secondary small', function () { S.tab = 'facts'; openDay(String(r.factId).slice(0, 10)); }),
+              btn('Entfernen', 'secondary small', function () {
+                if (!window.confirm('Diese Meldung entfernen? Sie verschwindet aus der Liste und geht nicht an die Wochenaufgabe.')) return;
+                removeReport(r);
+              }, S.busy))));
         })))) : h('p', { class: 'muted', text: 'Keine Meldungen.' }))];
   }
 
