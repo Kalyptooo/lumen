@@ -69,9 +69,16 @@ Beispiel für einen Eintrag in `draft.json` (Länge, Ton und Form):
 
 Die Fakten sind zeitlos. Aktuelles steht in einer eigenen Rubrik, die du in jedem Lauf neu schreibst: ein Dokument `news/<Laufdatum>`.
 
-- **Umfang:** 3 bis 5 Meldungen der letzten 7 Tage oder Änderungen, die in den nächsten vier Wochen gelten. Mindestens eine zu Recht oder Verwaltung in Österreich (neues oder geändertes Gesetz, Frist). Dazu Wirtschaft, Politik (Österreich, EU, Welt) und gelegentlich Tech.
-- **Felder je Meldung** (du lieferst): `area` (`recht`, `wirtschaft`, `politik`, `welt` oder `tech`), `title` (höchstens 70 Zeichen), `text` (30 bis 60 Wörter), `date` (Datum des Ereignisses oder des Inkrafttretens), `source` mit `name` und `url`. Das Skript ergänzt `id`, `upcoming` (wahr, wenn das Datum in der Zukunft liegt) und bei recht und wirtschaft den Hinweis „Allgemeine Information, keine Beratung. Stand <Datum>.“
-- **Quellen:** Die Websuche ist Pflicht. Jede Meldung stützt sich auf mindestens eine Seite, die du mit WebFetch tatsächlich geöffnet hast. Bevorzugt Primärquellen: ris.bka.gv.at, parlament.gv.at, oesterreich.gv.at, europa.eu, statistik.at, oenb.at. Daneben etablierte Medien wie orf.at. Nichts aus dem Gedächtnis ergänzen.
+- **Umfang:** 3 bis 5 Meldungen der letzten 7 Tage oder Änderungen, die in den nächsten vier Wochen gelten.
+- **Nur große Nachrichten.** Die Leserinnen und Leser wollen wissen, worüber gerade alle reden, nicht Fachmeldungen. Eine Meldung kommt nur hinein, wenn mindestens eins zutrifft:
+  - Sie war in der Woche eine Hauptmeldung: Aufmacher auf orf.at, in der ZIB 1 oder auf der Titelseite großer Zeitungen (Der Standard, Die Presse, Kurier, Kleine Zeitung), bei Weltthemen auch bei tagesschau.de oder Reuters.
+  - Sie betrifft spürbar sehr viele Menschen in Österreich: Geld (Steuern, Pensionen, Löhne, Preise, Mieten, Energie, Zinsen), Alltag (Verkehr, Schule, Arbeit, Gesundheit), Sicherheit.
+  - Es ist ein großes Weltereignis (Krieg und Frieden, Wahlen in großen Ländern, große Katastrophen, Entscheidungen der EU, die alle betreffen).
+- **Nicht hinein:** Personalien und Ladungen vor Ausschüssen, einzelne Gerichtsverfahren ohne große Folgen, Verwaltungsdetails (einzelne Behörden, Gerichtsstandorte, Verordnungen für wenige Berufe), Branchenmeldungen, kleine Statistiken, regionale Meldungen, Ankündigungen ohne Beschluss. Im Zweifel: Würde eine durchschnittliche Person in Österreich am Abend davon erzählen? Wenn nein, weglassen.
+- **Keine Quote je Bereich.** Nimm die wichtigsten Meldungen, egal aus welchem Bereich. Recht oder Verwaltung nur, wenn sich für viele etwas ändert (zum Beispiel neue Steuerstufen, Pensionserhöhung, Pickerl, Vignette, Mietpreisbremse). Tech nur bei großen Entwicklungen, die viele nutzen.
+- **Begründung:** Jede Meldung bekommt das Feld `why`: ein Satz, wen das betrifft oder warum es eine Hauptmeldung ist. Wird nicht angezeigt; das Skript lehnt Meldungen ohne Begründung ab.
+- **Felder je Meldung** (du lieferst): `area` (`recht`, `wirtschaft`, `politik`, `welt` oder `tech`), `title` (höchstens 70 Zeichen), `text` (30 bis 60 Wörter), `date` (Datum des Ereignisses oder des Inkrafttretens), `source` mit `name` und `url`, `why` (ein Satz, nicht angezeigt). Das Skript ergänzt `id`, `upcoming` (wahr, wenn das Datum in der Zukunft liegt) und bei recht und wirtschaft den Hinweis „Allgemeine Information, keine Beratung. Stand <Datum>.“
+- **Quellen:** Die Websuche ist Pflicht. Jede Meldung stützt sich auf mindestens eine Seite, die du mit WebFetch tatsächlich geöffnet hast. Etablierte Medien (orf.at, derstandard.at, diepresse.com, kurier.at, tagesschau.de, reuters.com) und Primärquellen (ris.bka.gv.at, parlament.gv.at, oesterreich.gv.at, europa.eu, statistik.at, oenb.at). Nichts aus dem Gedächtnis ergänzen.
 - **Ton:** Sachlich und neutral, in eigenen Worten, ohne wörtliche Zitate. Schreibe, was beschlossen wurde oder geschah und wer was gesagt hat, ohne Wertung, Prognose oder Wahlempfehlung. Streitthemen nur als Faktenlage, bei Positionen beide Seiten mit Namen.
 - Vermeide Themen der letzten drei Ausgaben, außer es gibt Neues dazu. Existiert für heute schon eine Ausgabe, lass sie unverändert.
 - Ist die Websuche oder das Öffnen von Seiten nicht möglich, oder findest du keine verlässlichen Meldungen: keine Ausgabe anlegen, Grund ins Protokoll.
@@ -124,10 +131,11 @@ Vorgehen:
 
 Nur bei freiem Webzugriff und wenn für heute noch keine Ausgabe existiert.
 
-1. Recherchiere mit WebSearch die Meldungen der letzten 7 Tage und kommende Änderungen (zum Beispiel „Bundesgesetzblatt diese Woche“, „Nationalrat Beschluss“, „tritt in Kraft“ mit dem kommenden Monat, EU-Beschlüsse, Statistik Austria, OeNB). Öffne die Quellen mit WebFetch.
-2. Schreibe `news.json` als Array von 3 bis 5 Meldungen: `{"area":"recht","title":"…","text":"…","date":"YYYY-MM-DD","source":{"name":"…","url":"https://…"}}`.
-3. `node tools/lumen-weekly.mjs news news.json` prüft und baut die Ausgabe. Trage `newsDate` = heutiges Datum in `out/run.json` ein (ohne Ausgabe: Grund in `notes`).
-4. `node tools/lumen-weekly.mjs apply`, dann committen und pushen.
+1. Beginne bei den Hauptmeldungen: Öffne die Startseiten von orf.at (Österreich und Ausland) und derstandard.at und suche mit WebSearch nach den wichtigsten Nachrichten der Woche in Österreich und der Welt. Ergänze Änderungen, die bald für viele gelten (zum Beispiel „ab 1. Jänner“, „tritt in Kraft“ mit dem kommenden Monat).
+2. Sammle 8 bis 12 Kandidaten und reihe sie nach Wichtigkeit für die Gruppe (siehe „Nur große Nachrichten“). Nimm die obersten 3 bis 5. Öffne für jede gewählte Meldung die Quelle mit WebFetch.
+3. Schreibe `news.json` als Array von 3 bis 5 Meldungen: `{"area":"politik","title":"…","text":"…","date":"YYYY-MM-DD","source":{"name":"…","url":"https://…"},"why":"…"}`.
+4. `node tools/lumen-weekly.mjs news news.json` prüft und baut die Ausgabe. Trage `newsDate` = heutiges Datum in `out/run.json` ein (ohne Ausgabe: Grund in `notes`).
+5. `node tools/lumen-weekly.mjs apply`, dann committen und pushen.
 
 ### Abschluss
 
