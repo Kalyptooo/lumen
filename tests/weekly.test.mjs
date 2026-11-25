@@ -272,9 +272,10 @@ test('Bauen beim Ersetzen verlangt die Version des vorhandenen Dokuments', () =>
   eq(res.errors, []);
   eq(res.writes[0].if_version, 3);
 });
-test('Aktuell: 3 bis 5 Meldungen mit Quelle, Recht dabei, 30 bis 60 Wörter', () => {
+test('Aktuell: 3 bis 5 große Meldungen mit Quelle und Begründung, 30 bis 60 Wörter', () => {
   const text = Array(40).fill('Wort').join(' ') + '.';
-  const item = (area, n) => ({ area, title: 'Meldung ' + n, text, date: '2026-11-1' + n, source: { name: 'RIS', url: 'https://www.ris.bka.gv.at/' + n } });
+  const item = (area, n) => ({ area, title: 'Meldung ' + n, text, date: '2026-11-1' + n, source: { name: 'RIS', url: 'https://www.ris.bka.gv.at/' + n },
+    why: 'Betrifft alle Pensionistinnen und Pensionisten in Österreich ab Jänner.' });
   let res = W.buildNews([item('recht', 1), item('wirtschaft', 2), item('welt', 3)], dbWith(), '2026-11-15');
   eq(res.errors, []);
   eq(res.doc.date, '2026-11-15');
@@ -284,7 +285,10 @@ test('Aktuell: 3 bis 5 Meldungen mit Quelle, Recht dabei, 30 bis 60 Wörter', ()
   eq(res.doc.items[0].upcoming, false);
   const future = item('recht', 1); future.date = '2026-12-01';
   eq(W.buildNews([future, item('politik', 2), item('tech', 3)], dbWith(), '2026-11-15').doc.items[0].upcoming, true);
-  assert.ok(W.buildNews([item('politik', 1), item('welt', 2), item('tech', 3)], dbWith(), '2026-11-15').errors.some((e) => /recht/.test(e)));
+  eq(W.buildNews([item('politik', 1), item('welt', 2), item('tech', 3)], dbWith(), '2026-11-15').errors, []);
+  eq(W.buildNews([item('politik', 1), item('welt', 2), item('tech', 3)], dbWith(), '2026-11-15').doc.items[0].why, undefined);
+  const noWhy = item('welt', 1); delete noWhy.why;
+  assert.ok(W.buildNews([noWhy, item('welt', 2), item('tech', 3)], dbWith(), '2026-11-15').errors.some((e) => /why fehlt/.test(e)));
   assert.ok(W.buildNews([item('recht', 1), item('welt', 2)], dbWith(), '2026-11-15').errors.some((e) => /3 bis 5/.test(e)));
   const noSource = item('recht', 1); noSource.source = { name: 'x', url: 'ftp://x' };
   assert.ok(W.buildNews([noSource, item('welt', 2), item('tech', 3)], dbWith(), '2026-11-15').errors.some((e) => /source/.test(e)));
