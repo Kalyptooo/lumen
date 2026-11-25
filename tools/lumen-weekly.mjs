@@ -613,7 +613,6 @@ export function buildNews(input, db, today) {
   if (!items) return { ok: false, errors: ['news.json braucht ein Array von Meldungen (oder {"items":[…]})'], warnings };
   if (db.news.some((n) => n.id === today)) errors.push(`Ausgabe ${today} existiert schon: unverändert lassen`);
   if (items.length < 3 || items.length > 5) errors.push(`${items.length} Meldungen (3 bis 5)`);
-  if (!items.some((i) => i && i.area === 'recht')) errors.push('mindestens eine Meldung im Bereich recht (Recht oder Verwaltung in Österreich)');
   const recentTitles = db.news.slice(0, 3).flatMap((n) => (n.data.items || []).map((i) => i.title));
   const out = items.map((it, n) => {
     const tag = `Meldung ${n + 1}`;
@@ -628,6 +627,9 @@ export function buildNews(input, db, today) {
       if (w < 30 || w > 60) errors.push(`${tag}: Text hat ${w} Wörter (30 bis 60)`);
       if (/[„“”"»«]/.test(it.text)) warnings.push(`${tag}: Anführungszeichen im Text – keine wörtlichen Zitate aus Artikeln`);
     }
+    // Only big news: each item says why it matters to many people. Not published, only a check against niche topics.
+    if (!str(it.why)) errors.push(`${tag}: why fehlt (ein Satz: wen das betrifft oder warum es in den Hauptnachrichten ist)`);
+    else if (wordCount(it.why) < 6) errors.push(`${tag}: why ist zu kurz (mindestens 6 Wörter)`);
     if (!isDate(it.date)) errors.push(`${tag}: date muss YYYY-MM-DD sein (Datum des Ereignisses)`);
     else {
       if (it.date > addDays(today, 28)) errors.push(`${tag}: Datum liegt mehr als vier Wochen in der Zukunft`);
