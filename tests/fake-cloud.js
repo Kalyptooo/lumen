@@ -108,6 +108,27 @@
       areaAccuracy: { geld: { read: 3, answered: 4, pct: 75 } }, reports: [{ factId: '2026-11-12-2', note: 'Zahl stimmt nicht', reportedAt: '2026-11-11T08:00:00.000Z' }], updatedAt: '2026-11-10T19:00:00.000Z' };
     save();
   }
+  // billing=trial|over|locked|open|due: the payment state of the signed-in person (lumen-billing.js).
+  const bill = p.get('billing');
+  if (bill) {
+    const hours = function (n) { return new Date(Date.now() + n * 3600000).toISOString(); };
+    const day = function (n) { return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10); };
+    store['billing/' + UID] = {
+      trial: { status: 'trial', trialStart: hours(-60), trialDays: 3 },
+      over: { status: 'trial', trialStart: hours(-80), trialDays: 3 },
+      locked: { status: 'locked', message: 'Bitte überweise 1 €, dann schalte ich dich wieder frei.', amount: 1 },
+      open: { status: 'open', amount: 1, payDay: 1, nextPay: day(20) },
+      due: { status: 'open', amount: 1.5, payDay: 1, nextPay: day(-2) }
+    }[bill];
+    store['config/billing'] = { trialDays: 3, contactEmail: 'admin@example.com', holder: 'Max Muster', iban: 'AT61 1904 3002 3457 3201', showBank: true };
+    save();
+  }
+  if (p.get('admin') === '1' && !store['billing/other-2']) {
+    store['billing/other-2'] = { status: 'trial', trialStart: new Date(Date.now() - 80 * 3600000).toISOString(), trialDays: 3 };
+    store['members/other-3'] = { email: 'berta@example.com', name: 'Berta', lastSeen: '2026-11-20' };
+    store['billing/other-3'] = { status: 'open', amount: 2, payDay: 20, nextPay: '2026-11-20' };
+    save();
+  }
   const origOn = auth.onAuthStateChanged;
   auth.onAuthStateChanged = function (cb) { seeded.then(function () { origOn(cb); }); return function () {}; };
 
