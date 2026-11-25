@@ -2,7 +2,11 @@
 // Needs the GitHub secret FIREBASE_SA (the JSON key of the Firebase service account). Without it, it does nothing.
 // Per person (Firestore push/<uid>): at each stage time (morgen, mittag, abend) one notification, only while that stage
 // is still open today, at most one per run, never twice for the same stage on the same day.
+// Also: a test reminder when the person asks for one in the app (push/<uid>.test), and nobody whose access is closed
+// (free days over or locked, see lumen-billing.js) gets reminders. Each send is noted in push/<uid>.last.
 import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+const Billing = createRequire(import.meta.url)('../lumen-billing.js');
 
 const SITE = 'https://kalyptooo.github.io/lumen/';
 const DEFAULT_TIMES = { morgen: '07:00', mittag: '12:00', abend: '18:00' };
@@ -65,9 +69,40 @@ try {
 
 const list = await (await fetch(`${DB}/push?pageSize=300`, { headers: auth })).json();
 let sentCount = 0;
+// Access per person, read only when someone is due (keeps the database reads low).
+let bills = null;
+async function hasAccess(uid) {
+  if (!bills) {
+    bills = {};
+    const got = await (await fetch(`${DB}/billing?pageSize=300`, { headers: auth })).json();
+    for (const d of got.documents || []) bills[d.name.split('/').pop()] = plain({ mapValue: { fields: d.fields || {} } });
+  }
+  return Billing.usable(Billing.access(bills[uid] || null, Date.now(), now.date));
+}
+async function push(token, body, tag) {
+  const res = await fetch(`https://fcm.googleapis.com/v1/projects/${project}/messages:send`, {
+    method: 'POST', headers: { ...auth, 'content-type': 'application/json' },
+    body: JSON.stringify({ message: { token, webpush: {
+      headers: { Urgency: 'high' },
+      notification: { title: 'Lumen', body, icon: SITE + 'icon-180.png', tag },
+      fcm_options: { link: SITE }
+    } } })
+  });
+  return { ok: res.ok, status: res.status, error: res.ok ? '' : await res.text() };
+}
+const lastOf = (r) => ({ mapValue: { fields: { at: { stringValue: new Date().toISOString() }, ok: { booleanValue: r.ok }, status: { integerValue: String(r.status) } } } });
 for (const doc of list.documents || []) {
   const uid = doc.name.split('/').pop();
   const p = plain({ mapValue: { fields: doc.fields || {} } });
+  if (p.test && p.token) {
+    const r = await push(p.token, 'Test: Die Erinnerungen funktionieren.', 'lumen-test');
+    if (r.ok) sentCount += 1; else console.log(`Test an ${uid.slice(0, 6)}… fehlgeschlagen: ${r.status} ${r.error.slice(0, 160)}`);
+    const fields = { test: { booleanValue: false }, last: lastOf(r) };
+    let mask = 'updateMask.fieldPaths=test&updateMask.fieldPaths=last';
+    if (!r.ok && /UNREGISTERED|NOT_FOUND|INVALID_ARGUMENT/.test(r.error)) { fields.enabled = { booleanValue: false }; mask += '&updateMask.fieldPaths=enabled'; }
+    await fetch(`${DB}/push/${uid}?${mask}`, { method: 'PATCH', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ fields }) });
+    continue;
+  }
   if (!p.enabled || !p.token) continue;
   const times = Object.assign({}, DEFAULT_TIMES, p.times || {});
   const sent = p.sent && p.sent.date === now.date ? (p.sent.blocks || []) : [];
@@ -77,6 +112,7 @@ for (const doc of list.documents || []) {
     return t !== null && now.minutes >= t && now.minutes < t + LATE && !sent.includes(b);
   });
   if (!due.length) continue;
+  if (!(await hasAccess(uid))) continue;
   // Which stages are already done today?
   let done = [];
   try {
@@ -86,25 +122,20 @@ for (const doc of list.documents || []) {
   } catch (e) { /* no month document yet */ }
   const open = due.filter((b) => !done.includes(b));
   const block = open[open.length - 1];
-  let enabled = true;
+  let enabled = true, result = null;
   if (block && factsToday) {
-    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${project}/messages:send`, {
-      method: 'POST', headers: { ...auth, 'content-type': 'application/json' },
-      body: JSON.stringify({ message: { token: p.token, webpush: {
-        notification: { title: 'Lumen', body: TEXT[block], icon: SITE + 'icon-180.png', tag: 'lumen-' + block },
-        fcm_options: { link: SITE }
-      } } })
-    });
-    if (res.ok) sentCount += 1;
+    result = await push(p.token, TEXT[block], 'lumen-' + block);
+    if (result.ok) sentCount += 1;
     else {
-      const err = await res.text();
-      if (/UNREGISTERED|NOT_FOUND|INVALID_ARGUMENT/.test(err)) enabled = false;
-      console.log(`Senden an ${uid.slice(0, 6)}… fehlgeschlagen: ${res.status}`);
+      // The phone's address expired (iOS does that). The app renews it the next time the person opens Lumen.
+      if (/UNREGISTERED|NOT_FOUND|INVALID_ARGUMENT/.test(result.error)) enabled = false;
+      console.log(`Senden an ${uid.slice(0, 6)}… fehlgeschlagen: ${result.status} ${result.error.slice(0, 160)}`);
     }
   }
   const blocks = sent.concat(due);
   const fields = { sent: { mapValue: { fields: { date: { stringValue: now.date }, blocks: { arrayValue: { values: blocks.map((b) => ({ stringValue: b })) } } } } } };
   let mask = 'updateMask.fieldPaths=sent';
+  if (result) { fields.last = lastOf(result); mask += '&updateMask.fieldPaths=last'; }
   if (!enabled) { fields.enabled = { booleanValue: false }; mask += '&updateMask.fieldPaths=enabled'; }
   await fetch(`${DB}/push/${uid}?${mask}`, { method: 'PATCH', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ fields }) });
 }
