@@ -1595,11 +1595,18 @@ details.more { border-top: .5px solid var(--line); }
     S.phase = 'loading';
     render();
     startTimer();
-    loadBilling().then(function () {
+    freshToken(user).then(loadBilling).then(function () {
       if (S.uid !== user.uid) return;
       if (!B.usable(billState())) { lockOut(); return; }
       startLoading();
     });
+  }
+  /* Right after the e-mail link the account says "confirmed", but the database pass (ID token) still says "not confirmed"
+     for up to an hour. The database would then refuse the free days and everything else. So renew the pass first. */
+  function freshToken(user) {
+    return Promise.resolve().then(function () { return user.getIdTokenResult(); })
+      .then(function (r) { if (!r || !r.claims || r.claims.email_verified !== true) return user.getIdToken(true); })
+      .catch(function () { /* offline: the database decides */ });
   }
   function startLoading() {
     subPrivate();
@@ -1646,7 +1653,10 @@ details.more { border-top: .5px solid var(--line); }
         S.bill = { status: 'trial', trialStart: nowISO(), trialDays: days };
         return ref.set({ status: 'trial', trialStart: serverTime(), trialDays: days });
       });
-    }).catch(function () { /* older rules or offline: the database decides anyway */ });
+    }).catch(function (e) {
+      // Offline the database decides anyway. A refusal here means the free days could not start: say so on the lock screen.
+      if (e && e.code === 'permission-denied') S.billFailed = true;
+    });
     // Never wait long: offline the app opens from its own copy.
     return Promise.race([Promise.all([own, cfg]), new Promise(function (r) { setTimeout(r, 4000); })]);
   }
@@ -1854,6 +1864,19 @@ details.more { border-top: .5px solid var(--line); }
   function deniedCard() {
     const u = S.authUser, a = billState(), cfg = S.billCfg || {};
     const locked = a.state === 'locked', over = a.state === 'trialOver';
+    // No free days on record although everyone gets them: a start-up problem, not a decision of the admin.
+    if (!locked && !over) {
+      return h('div', { class: 'card' }, h('h2', { class: 'title', text: 'Lumen startet gleich' }),
+        h('p', { class: 'lead', text: 'Deine ' + (Number.isInteger((S.billCfg || {}).trialDays) ? S.billCfg.trialDays : B.TRIAL_DAYS) + ' Gratis-Tage konnten gerade nicht beginnen. Das passiert manchmal direkt nach dem Bestätigen der E-Mail-Adresse. Tippe auf „Erneut versuchen“.' }),
+        btn('Erneut versuchen', 'primary', function () {
+          const user = C.auth.currentUser;
+          if (!user) { location.reload(); return; }
+          user.getIdToken(true).catch(function () {}).then(function () { location.reload(); });
+        }),
+        h('p', { class: 'hint', text: 'Klappt es auch nach ein paar Minuten nicht, melde dich beim Admin' + (cfg.contactEmail ? ' (' + cfg.contactEmail + ')' : '') + '.' }),
+        btn('Abmelden', 'link', signOut),
+        btn('Konto löschen', 'link', openDeleteAccount));
+    }
     const amount = S.bill && Number(S.bill.amount) > 0 ? B.euro(S.bill.amount) : '';
     const row = function (label, value) { return value ? h('div', { class: 'billrow' }, h('span', { text: label }), h('b', { text: value })) : null; };
     return h('div', { class: 'card' },
