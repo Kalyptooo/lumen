@@ -2,9 +2,9 @@
    - Offline: pages, scripts and content are served from the network when possible and from the cache otherwise.
    - Reminders: shows the notifications that tools/send-reminders.mjs sends through Firebase Cloud Messaging.
      Every push shows a notification, also while Lumen is open: iOS cancels the reminders of apps that receive pushes without showing one. */
-const CACHE = 'lumen-v21';
+const CACHE = 'lumen-v22';
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
-const SHELL = ['./', 'index.html', 'lumen-cloud.js', 'lumen-billing.js', 'lumen-touch.js', 'firebase-config.js', 'manifest.webmanifest', 'icon-180.png', 'icon.svg',
+const SHELL = ['./', 'index.html', 'lumen-cloud.js', 'lumen-billing.js', 'lumen-touch.js', 'firebase-config.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'badge-96.png', 'icon.svg',
   SDK + 'firebase-app-compat.js', SDK + 'firebase-auth-compat.js', SDK + 'firebase-firestore-compat.js', SDK + 'firebase-messaging-compat.js'];
 
 /* A push from Firebase Cloud Messaging carries { notification: { title, body, icon, tag }, fcmOptions: { link } }. */
@@ -14,7 +14,7 @@ self.addEventListener('push', function (event) {
   const n = d.notification || {};
   const link = (d.fcmOptions && d.fcmOptions.link) || (d.data && d.data.link) || './';
   event.waitUntil(self.registration.showNotification(n.title || 'Lumen', {
-    body: n.body || 'Es wartet etwas auf dich.', icon: n.icon || 'icon-180.png', tag: n.tag || 'lumen', data: { link: link }
+    body: n.body || 'Es wartet etwas auf dich.', icon: n.icon || 'icon-192.png', badge: 'badge-96.png', tag: n.tag || 'lumen', data: { link: link }
   }));
 });
 

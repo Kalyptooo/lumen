@@ -11,9 +11,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Lumen">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>if (/Android/.test(navigator.userAgent)) document.documentElement.classList.add('android');</script>
 <script>try { var lt = localStorage.getItem('lumen-theme'); if (lt) document.documentElement.setAttribute('data-theme', lt); } catch (e) {}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
 /* Layout: one column for the thumb. Each screen shows one card with one main action; tabs sit at the bottom. */
@@ -72,6 +74,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
   padding-top: max(6px, calc(env(safe-area-inset-top, 0px) + 46px)); padding-bottom: 2px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
+html.android .top { padding-top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px)); }
 .brand { display: flex; flex-direction: column; min-width: 0; }
 .brand h1 { font-family: var(--font-read); font-size: 1.75rem; font-weight: 600; line-height: 1.15; }
 .status { color: var(--muted); font-size: .8125rem; min-width: 0; line-height: 1.3; }
@@ -2058,6 +2061,7 @@ details.more { border-top: .5px solid var(--line); }
     else renderYou();
     S.sheets.forEach(function (s) { if (s.live && !typingIn(s)) s.draw(); });
     maybeAskPush();
+    syncBack();
   }
   const VIEWS = [['today', 'viewToday'], ['practice', 'viewPractice'], ['archive', 'viewArchive'], ['you', 'viewYou']];
   const motion = function () { return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); };
@@ -2510,6 +2514,7 @@ details.more { border-top: .5px solid var(--line); }
     sheet.draw();
     sheet.panel.querySelector('.iconbtn').focus();
     dragToClose(sheet);
+    syncBack();
     return sheet;
   }
   /* Swipe a sheet down to close it: from the handle or header, or from the content when it is scrolled to the top. */
@@ -2561,6 +2566,7 @@ details.more { border-top: .5px solid var(--line); }
     } else { scrim.remove(); panel.remove(); }
     if (sheet.onclose) sheet.onclose();
     try { if (sheet.opener && document.contains(sheet.opener)) sheet.opener.focus(); } catch (e) { /* ignore */ }
+    syncBack();
   }
 
   function openDetail(factId) {
@@ -2699,6 +2705,14 @@ details.more { border-top: .5px solid var(--line); }
     return { phone: ios || android, ios: ios, android: android, iosMajor: v, browser: browser };
   }
   const mustInstall = function () { return device().phone && !installed(); };
+  const homeWord = function () { return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? 'Home-Bildschirm' : 'Startbildschirm'; };
+  function installTip() {
+    const ua = navigator.userAgent;
+    const end = ' Dann startet Lumen wie eine App, geht offline und kann dich erinnern.';
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'Tipp: In Safari „Teilen“ → „Zum Home-Bildschirm“.' + end;
+    if (/Android/.test(ua)) return 'Tipp: Im Browser-Menü ⋮ → „Zum Startbildschirm hinzufügen“ oder „App installieren“.' + end;
+    return 'Tipp: In Chrome oder Edge kannst du Lumen über das Symbol rechts in der Adresszeile als App installieren.' + end;
+  }
   let installPrompt = null;
   window.addEventListener('beforeinstallprompt', function (e) {
     if (!mustInstall()) return;
@@ -2760,7 +2774,7 @@ details.more { border-top: .5px solid var(--line); }
         steps = [step('Tippe unten rechts auf ', sym('≡'), '.'), step('Tippe auf ', b('Seite hinzufügen zu'), ' und dann auf ', b('Startbildschirm'), '.'),
           step('Tippe auf ', b('Hinzufügen'), '.'), finish];
       } else if (d.browser === 'chrome' || d.browser === 'firefox' || d.browser === 'edge') {
-        steps = [step('Tippe ' + (d.browser === 'edge' ? 'unten' : 'oben') + ' rechts auf ', sym(d.browser === 'edge' ? '•••' : '⋮'), '.'),
+        steps = [step('Tippe ' + (d.browser === 'edge' ? 'unten' : d.browser === 'firefox' ? 'oben oder unten' : 'oben') + ' rechts auf ', sym(d.browser === 'edge' ? '•••' : '⋮'), '.'),
           step('Tippe auf ', b('Zum Startbildschirm hinzufügen'), ' (manchmal heißt es ', b('App installieren'), ').'),
           step('Bestätige mit ', b('Installieren'), ' oder ', b('Hinzufügen'), '.'), finish];
       } else {
@@ -2851,7 +2865,7 @@ details.more { border-top: .5px solid var(--line); }
       writePriv('settings', { push: true });
       toast('Erinnerungen sind an.');
     } catch (e) {
-      toast(e && e.message === 'unsupported' ? 'Erinnerungen gehen nur, wenn Lumen vom Home-Bildschirm aus geöffnet ist.' : 'Das hat gerade nicht geklappt. Versuch es später noch einmal.');
+      toast(e && e.message === 'unsupported' ? 'Erinnerungen gehen nur, wenn Lumen vom ' + homeWord() + ' aus geöffnet ist.' : 'Das hat gerade nicht geklappt. Versuch es später noch einmal.');
     }
     pushBusy = false; redraw();
   }
@@ -2865,7 +2879,7 @@ details.more { border-top: .5px solid var(--line); }
   function pushRow(t) {
     const redraw = function () { render(); };
     const on = settings().push === true;
-    return h('div', { class: 'switchrow' }, h('span', {}, 'Erinnerungen', h('small', { class: 'hint', style: 'display:block', text: on ? L.BLOCKS.filter(function (b) { return planCfg().counts[b] > 0; }).map(function (b) { return t[b]; }).join(', ') + ' Uhr' : (standalone() ? 'zu den Etappen, wenn noch etwas offen ist' : 'nur vom Home-Bildschirm aus') })),
+    return h('div', { class: 'switchrow' }, h('span', {}, 'Erinnerungen', h('small', { class: 'hint', style: 'display:block', text: on ? L.BLOCKS.filter(function (b) { return planCfg().counts[b] > 0; }).map(function (b) { return t[b]; }).join(', ') + ' Uhr' : (standalone() ? 'zu den Etappen, wenn noch etwas offen ist' : 'nur vom ' + homeWord() + ' aus') })),
       h('input', { id: 'pushToggle', type: 'checkbox', role: 'switch', checked: on, disabled: pushBusy || (!on && !standalone()), onchange: function (e) { if (e.target.checked) enablePush(redraw); else disablePush(redraw); } }));
   }
   function pushSection(t) {
@@ -2874,7 +2888,7 @@ details.more { border-top: .5px solid var(--line); }
     return h('div', { class: 'section' }, h('h3', { text: 'Erinnerungen' }),
       h('p', { class: 'hint', text: on
         ? 'Lumen erinnert dich um ' + t.morgen + ', ' + t.mittag + ' und ' + t.abend + ' Uhr, wenn die Etappe noch offen ist. Die Uhrzeiten änderst du oben bei den Etappen.'
-        : 'Lumen kann dich zu den drei Etappen erinnern, aber nur, wenn noch etwas offen ist.' + (standalone() ? '' : ' Dafür musst du Lumen zuerst zum Home-Bildschirm hinzufügen und von dort öffnen.') }),
+        : 'Lumen kann dich zu den drei Etappen erinnern, aber nur, wenn noch etwas offen ist.' + (standalone() ? '' : ' Dafür musst du Lumen zuerst zum ' + homeWord() + ' hinzufügen und von dort öffnen.') }),
       on ? btn('Test-Erinnerung schicken', 'secondary', function () { sendTestPush(redraw); }) : null,
       on ? btn('Erinnerungen ausschalten', 'secondary', function () { disablePush(redraw); })
         : btn(pushBusy ? 'Einen Moment …' : 'Erinnerungen einschalten', 'primary', function () { enablePush(redraw); }, pushBusy || !standalone()));
@@ -3152,7 +3166,7 @@ details.more { border-top: .5px solid var(--line); }
             writePriv('settings', { haptics: !!e.target.checked });
             if (e.target.checked) setTimeout(function () { tick('single'); }, 0);
           } }))),
-      standalone() ? null : h('p', { class: 'hint pad', text: 'Tipp: In Safari „Teilen“ → „Zum Home-Bildschirm“. Dann startet Lumen wie eine App, geht offline und kann dich erinnern.' }),
+      standalone() ? null : h('p', { class: 'hint pad', text: installTip() }),
       h('div', { class: 'section' }, h('h3', { text: 'Darstellung' }),
         h('div', { class: 'seg', role: 'group', 'aria-label': 'Darstellung' }, [['auto', 'Auto'], ['light', 'Hell'], ['dark', 'Dunkel'], ['black', 'Schwarz']].map(function (o) {
           return h('button', { type: 'button', text: o[1], 'aria-pressed': String((settings().theme || 'auto') === o[0]), onclick: function () { writePriv('settings', { theme: o[0] }); setTheme(o[0]); } });
@@ -3448,6 +3462,29 @@ details.more { border-top: .5px solid var(--line); }
       render();
       if (value.trim().length >= 3 && S.phase === 'ready') searchTopics();
     }, 250);
+  });
+  /* Android: the back gesture (or back button) first closes an open window, then leaves a Du page, then returns to
+     "Heute". Only on "Heute" with nothing open does it close Lumen, like in any Android app. For that Lumen keeps one
+     extra history entry exactly while there is something to go back from. */
+  let backGuard = false, backSkip = false;
+  const backOn = /Android/.test(navigator.userAgent) || (C && C.fake && /[?&]android=1/.test(location.search));
+  function canGoBack() { return S.phase === 'ready' && (S.sheets.length > 0 || S.tab !== 'today'); }
+  function syncBack() {
+    if (!backOn) return;
+    const need = canGoBack();
+    try {
+      if (need && !backGuard) { history.pushState({ lumenBack: true }, ''); backGuard = true; }
+      else if (!need && backGuard) { backGuard = false; backSkip = true; history.back(); }
+    } catch (e) { /* ignore */ }
+  }
+  window.addEventListener('popstate', function () {
+    if (!backOn) return;
+    if (backSkip) { backSkip = false; syncBack(); return; }
+    backGuard = false;
+    if (S.sheets.length) closeSheet(S.sheets[S.sheets.length - 1]);
+    else if (S.tab === 'you' && S.youPage) openYou(null);
+    else if (S.tab !== 'today' && S.phase === 'ready') { S.tab = 'today'; render(); scrollTop(); }
+    syncBack();
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && S.sheets.length) closeSheet(S.sheets[S.sheets.length - 1]);
